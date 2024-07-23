@@ -1,0 +1,267 @@
+<!-- group -->
+<!DOCTYPE html>
+<!-- <html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Group Chat</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        #chatPage {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        #messageList {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            border: 1px solid #ccc;
+            margin-bottom: 10px;
+        }
+
+        #messageInput, #sendMessageButton {
+            padding: 10px;
+        }
+
+        #messageInput {
+            width: calc(100% - 80px);
+        }
+
+        #sendMessageButton {
+            width: 60px;
+        }
+
+        .notification {
+            background-color: #ffef96;
+            padding: 10px;
+            border: 1px solid #ccc;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="chatPage">
+        <h2>Group Chat</h2>
+        <div id="messageList"></div>
+        <input type="text" id="messageInput" placeholder="Type a message...">
+        <button id="sendMessageButton">Send</button>
+        <div id="notifications"></div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // const socket = io();
+            const socket = io.connect('http://localhost:8000', {
+    auth: {
+        token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTUsImVtYWlsIjoiYXdhaXNAZ21haWwuY29tIiwiaWF0IjoxNzIwNzY3MTI2LCJleHAiOjE3MjMzNTkxMjZ9.HCMW52wMbUchG1R3Jf5wS8a3y2ntr5GSWh5kNQW73ao'
+    }
+    
+});
+
+
+            const messageList = document.getElementById('messageList');
+            const messageInput = document.getElementById('messageInput');
+            const sendMessageButton = document.getElementById('sendMessageButton');
+            const notifications = document.getElementById('notifications');
+
+            const groupId = prompt("Enter Group ID:", "58");
+            const userId = prompt("Enter User ID:", "49");
+
+            socket.emit('joinGroup', { groupId, userId });
+
+            socket.on('loadMessages', (messages) => {
+                messageList.innerHTML = '';
+                messages.forEach(msg => {
+                    const messageElement = document.createElement('div');
+                    messageElement.textContent = `${msg.userId}: ${msg.message}`;
+                    messageList.appendChild(messageElement);
+                });
+            });
+
+            socket.on('message', (msg) => {
+                const messageElement = document.createElement('div');
+                messageElement.textContent = `${msg.userId}: ${msg.message}`;
+                messageList.appendChild(messageElement);
+            });
+
+            sendMessageButton.addEventListener('click', () => {
+                const message = messageInput.value;
+                if (message.trim() !== '') {
+                    socket.emit('sendMessage', { groupId, userId, message });
+                    messageInput.value = '';
+                }
+            });
+
+            socket.on('notification', (notification) => {
+                const notificationElement = document.createElement('div');
+                notificationElement.className = 'notification';
+                notificationElement.textContent = `New message in group ${notification.groupId}: ${notification.message.message}`;
+                notifications.appendChild(notificationElement);
+            });
+        });
+    </script>
+</body>
+</html> -->
+
+<!-- one to one chat -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Private Chat</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        #chatPage {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        #messageList {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            border: 1px solid #ccc;
+            margin-bottom: 10px;
+        }
+
+        #messageInput, #sendMessageButton {
+            padding: 10px;
+        }
+
+        #messageInput {
+            width: calc(100% - 80px);
+        }
+
+        #sendMessageButton {
+            width: 60px;
+        }
+
+        .notification {
+            background-color: #ffef96;
+            padding: 10px;
+            border: 1px solid #ccc;
+            margin-bottom: 10px;
+        }
+
+        #typingIndicator {
+            display: none;
+            font-style: italic;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+    <div id="chatPage">
+        <h2>Private Chat</h2>
+        <div id="messageList"></div>
+        <input type="text" id="messageInput" placeholder="Type a message...">
+        <button id="sendMessageButton">Send</button>
+        <div id="typingIndicator">User is typing...</div>
+        <div id="notifications"></div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // const socket = io();
+
+            const socket = io.connect('http://localhost:8000', {
+    auth: {
+        token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTUsImVtYWlsIjoiYXdhaXNAZ21haWwuY29tIiwiaWF0IjoxNzIwNzY3MTI2LCJleHAiOjE3MjMzNTkxMjZ9.HCMW52wMbUchG1R3Jf5wS8a3y2ntr5GSWh5kNQW73ao'
+    }
+});
+
+
+            const messageList = document.getElementById('messageList');
+            const messageInput = document.getElementById('messageInput');
+            const sendMessageButton = document.getElementById('sendMessageButton');
+            const typingIndicator = document.getElementById('typingIndicator');
+            const notifications = document.getElementById('notifications');
+
+            const senderId = prompt("Enter your User ID:", "44");
+            const receiverPhoneNumber = prompt("Enter receiver's phone number:", "123123123");
+
+            socket.emit('startChat', { senderId, receiverPhoneNumber });
+
+            socket.on('loadPrivateMessages', (messages) => {
+                messageList.innerHTML = '';
+                messages.forEach(msg => {
+                    displayMessage(msg);
+                });
+            });
+
+            messageInput.addEventListener('input', () => {
+                socket.emit('userTyping', { senderId, receiverId });
+            });
+
+            messageInput.addEventListener('blur', () => {
+                socket.emit('userStoppedTyping', { senderId, receiverId });
+            });
+
+            socket.on('typing', (typingSenderId) => {
+                if (typingSenderId === senderId) {
+                    typingIndicator.style.display = 'block';
+                }
+            });
+
+            socket.on('stoppedTyping', (typingSenderId) => {
+                if (typingSenderId === senderId) {
+                    typingIndicator.style.display = 'none';
+                }
+            });
+
+            sendMessageButton.addEventListener('click', () => {
+                const message = messageInput.value;
+                if (message.trim() !== '') {
+                    socket.emit('sendPrivateMessage', { senderId, receiverPhoneNumber, message });
+                    messageInput.value = '';
+                }
+            });
+
+            socket.on('privateMessage', (msg) => {
+                displayMessage(msg);
+            });
+
+            socket.on('notification', (notification) => {
+                const notificationElement = document.createElement('div');
+                notificationElement.className = 'notification';
+                notificationElement.textContent = `New private message from ${notification.senderId}: ${notification.message.message}`;
+                notifications.appendChild(notificationElement);
+            });
+
+            socket.on('disconnect', () => {
+                socket.emit('userDisconnect', senderId);
+            });
+            
+
+            // Function to display message in messageList
+            function displayMessage(msg) {
+                const messageElement = document.createElement('div');
+                messageElement.textContent = `${msg.senderId}: ${msg.message}`;
+                messageList.appendChild(messageElement);
+            }
+        });
+    </script>
+</body>
+</html>
+
+
+
+
+
+
