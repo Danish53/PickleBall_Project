@@ -14,11 +14,11 @@ const PrivateMessage = sequelize.define(
       type: DataTypes.TEXT,
       allowNull: false,
     },
-    senderId: {
+    senderPhoneNumber: {
       type: DataTypes.INTEGER,
       allowNull: false,
     },
-    receiverId: {
+    receiverPhoneNumber: {
       type: DataTypes.INTEGER,
       allowNull: false,
     },

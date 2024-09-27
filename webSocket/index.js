@@ -8,32 +8,39 @@ import { Users } from "../model/userModel.js";
 export default (io) => {
   io.on("connection", (socket) => {
     console.log("A user connected");
+    // console.log(socket, "socket");
 
-    socket.on("userConnect", (userId) => {
-      io.emit("userOnline", userId);
+    socket.on("userConnect", (userPhoneNumber) => {
+      io.emit("userOnline", userPhoneNumber);
+      console.log(userPhoneNumber, "connected");
     });
 
-    socket.on("userDisconnect", (userId) => {
-      io.emit("userOffline", userId);
+    socket.on("userDisconnect", (userPhoneNumber) => {
+      io.emit("userOffline", userPhoneNumber);
     });
 
-    socket.on("joinGroup", async ({ groupId, userId }) => {
+    socket.on("joinGroup", async ({ groupId, userPhoneNumber }) => {
       try {
         const groupMember = await groupMembers.findOne({
-          where: { groupId, userId },
+          where: { groupId, userPhoneNumber },
         });
 
         if (!groupMember) {
           socket.emit("error", "You are not a member of this group");
+          console.log("You are not a member of this group");
           return;
         }
 
         socket.join(groupId);
-        console.log(`User ${groupMember.userId} joined group ${groupId}`);
+        console.log(
+          `User ${groupMember.userPhoneNumber} joined group ${groupId}`
+        );
 
-        const messages = await Message.findAll({ where: { groupId }, 
-          order: [["createdAt", "ASC"]], 
-          limit: 100 });
+        const messages = await Message.findAll({
+          where: { groupId },
+          order: [["createdAt", "ASC"]],
+          limit: 100,
+        });
         socket.emit("loadMessages", messages);
       } catch (error) {
         console.error("Error loading messages:", error);
@@ -41,7 +48,7 @@ export default (io) => {
     });
 
     // Event listener for 'sendMessage'
-    socket.on("sendMessage", async ({ groupId, userId, message }) => {
+    socket.on("sendMessage", async ({ groupId, userPhoneNumber, message }) => {
       try {
         const groupMemberss = await groupMembers.findAll({
           where: { groupId },
@@ -49,14 +56,18 @@ export default (io) => {
         console.log("Fetched group members:", groupMemberss);
 
         if (Array.isArray(groupMemberss)) {
-          const newMessage = await Message.create({ groupId, userId, message });
+          const newMessage = await Message.create({
+            groupId,
+            userPhoneNumber,
+            message,
+          });
           io.to(groupId).emit("message", newMessage);
 
           // Send notification to group members
           groupMemberss.forEach((member) => {
-            if (member.userId !== userId) {
+            if (member.userPhoneNumber !== userPhoneNumber) {
               socket.broadcast
-                .to(member.userId.toString())
+                .to(member.userPhoneNumber.toString())
                 .emit("notification", {
                   type: "group",
                   groupId,
@@ -72,173 +83,235 @@ export default (io) => {
       }
     });
 
-    socket.on("startChat", async ({ senderId, receiverPhoneNumber }) => {
-      try {
-        // const sender = await Users.findByPk(senderId);
-        const receiver = await Users.findOne({
-          where: { phoneNumber: receiverPhoneNumber },
-        });
+    // Event listener for 'deleteMessage'
+    socket.on(
+      "deleteMessage",
+      async ({ messageId, groupId, userPhoneNumber }) => {
+        try {
+          // Check if message exists
+          const message = await Message.findOne({
+            where: { id: messageId, groupId },
+          });
 
-        if (!receiver) {
-          socket.emit("error", "Receiver not found");
-          return;
+          if (!message) {
+            socket.emit("error", "Message not found");
+            return;
+          }
+
+          // Check if the user is authorized to delete the message
+          if (message.userPhoneNumber !== userPhoneNumber) {
+            socket.emit("error", "You can only delete your own messages");
+            return;
+          }
+
+          // Delete the message from the database
+          await Message.destroy({ where: { id: messageId } });
+
+          // Emit a delete event to all clients in the group
+          io.to(groupId).emit("messageDeleted", messageId);
+
+          // Optionally, send a notification to group members about the message deletion
+          const groupMemberss = await groupMembers.findAll({
+            where: { groupId },
+          });
+          groupMemberss.forEach((member) => {
+            if (member.userPhoneNumber !== userPhoneNumber) {
+              socket.broadcast
+                .to(member.userPhoneNumber.toString())
+                .emit("notification", {
+                  type: "group",
+                  groupId,
+                  message: `A message was deleted in group ${groupId}`,
+                });
+            }
+          });
+        } catch (error) {
+          console.error("Error deleting message:", error);
+          socket.emit("error", "Failed to delete message");
         }
+      }
+    );
 
-        const privateRoomSenderToReceiver = [senderId, receiver.id]
+   
+   
+    // private chat
+
+    // Event listener for 'startChat'
+    socket.on(
+      "startChat",
+      async ({ senderPhoneNumber, receiverPhoneNumber }) => {
+        try {
+          // Find receiver by phone number
+          const receiver = await Users.findOne({
+            where: { phoneNumber: receiverPhoneNumber },
+          });
+
+          if (!receiver) {
+            socket.emit("error", "Receiver not found");
+            return;
+          }
+
+          // Find sender by phone number
+          const sender = await Users.findOne({
+            where: { phoneNumber: senderPhoneNumber },
+          });
+
+          if (!sender) {
+            socket.emit("error", "Sender not found");
+            return;
+          }
+
+          // Create a unique room based on phone numbers
+          const privateRoom = [sender.phoneNumber, receiver.phoneNumber]
+            .sort()
+            .join("-");
+
+          // Join the private room for both the sender and receiver
+          socket.join(privateRoom);
+
+          // Fetch chat history between the sender and receiver using phone numbers
+          const messages = await PrivateMessage.findAll({
+            where: {
+              [Op.or]: [
+                { senderPhoneNumber, receiverPhoneNumber },
+                {
+                  senderPhoneNumber: receiverPhoneNumber,
+                  receiverPhoneNumber: senderPhoneNumber,
+                },
+              ],
+            },
+            order: [["createdAt", "ASC"]],
+          });
+
+          // Send the chat history to the client
+          socket.emit("loadPrivateMessages", messages);
+        } catch (error) {
+          console.error("Error starting chat:", error);
+          socket.emit("error", "Failed to start chat");
+        }
+      }
+    );
+
+    // private messages
+    socket.on(
+      "sendPrivateMessage",
+      async ({ senderPhoneNumber, receiverPhoneNumber, message }) => {
+        try {
+          // Find receiver by phone number
+          const receiver = await Users.findOne({
+            where: { phoneNumber: receiverPhoneNumber },
+          });
+          if (!receiver) {
+            socket.emit("error", "Receiver not found");
+            return;
+          }
+
+          // Find sender by phone number
+          const sender = await Users.findOne({
+            where: { phoneNumber: senderPhoneNumber },
+          });
+          if (!sender) {
+            socket.emit("error", "Sender not found");
+            return;
+          }
+
+          // Save the message to the database
+          const newMessage = await PrivateMessage.create({
+            senderPhoneNumber: sender.phoneNumber,
+            receiverPhoneNumber: receiver.phoneNumber,
+            message,
+          });
+
+          // Create a unique room based on phone numbers
+          const privateRoom = [sender.phoneNumber, receiver.phoneNumber]
+            .sort()
+            .join("-");
+
+          // Emit the message to the private room
+          io.to(privateRoom).emit("privateMessage", newMessage);
+
+          // Optionally, you can send a notification to the receiver
+          socket.broadcast.to(receiverPhoneNumber).emit("notification", {
+            type: "private",
+            senderPhoneNumber: sender.phoneNumber,
+            message: newMessage,
+          });
+        } catch (error) {
+          console.error("Error sending private message:", error);
+          socket.emit("error", "Failed to send message");
+        }
+      }
+    );
+
+    // Event listener for 'deletePrivateMessage'
+    socket.on(
+      "deletePrivateMessage",
+      async ({ messageId, senderPhoneNumber }) => {
+        try {
+          // Find the message by its ID
+          const message = await PrivateMessage.findByPk(messageId);
+
+          if (!message) {
+            socket.emit("error", "Message not found");
+            return;
+          }
+
+          // Find the sender by phone number
+          const sender = await Users.findOne({
+            where: { phoneNumber: senderPhoneNumber },
+          });
+
+          if (!sender) {
+            socket.emit("error", "Sender not found");
+            return;
+          }
+
+          // Check if the sender is the one who sent the message
+          if (message.senderPhoneNumber !== sender.phoneNumber) {
+            socket.emit("error", "You can only delete your own messages");
+            return;
+          }
+
+          // Delete the message
+          await message.destroy();
+
+          // Create a private room based on phone numbers
+          const privateRoom = [
+            message.senderPhoneNumber,
+            message.receiverPhoneNumber,
+          ]
+            .sort()
+            .join("-");
+
+          // Emit an event to the room that the message has been deleted
+          io.to(privateRoom).emit("deleteMessage", { messageId });
+        } catch (error) {
+          console.error("Error deleting private message:", error);
+          socket.emit("error", "Error deleting private message");
+        }
+      }
+    );
+
+    socket.on("userTyping", ({ senderPhoneNumber, receiverPhoneNumber }) => {
+      const privateRoom = [senderPhoneNumber, receiverPhoneNumber]
+        .sort()
+        .join("-");
+
+      // Emit "typing" event to the private room
+      io.to(privateRoom).emit("typing", senderPhoneNumber);
+    });
+
+    socket.on(
+      "userStoppedTyping",
+      ({ senderPhoneNumber, receiverPhoneNumber }) => {
+        const privateRoom = [senderPhoneNumber, receiverPhoneNumber]
           .sort()
           .join("-");
-        const privateRoomReceiverToSender = [receiver.id, senderId]
-          .sort()
-          .join("-");
 
-        socket.join(privateRoomSenderToReceiver);
-        socket.join(privateRoomReceiverToSender);
-
-        const messages = await PrivateMessage.findAll({
-          where: {
-            [Op.or]: [
-              { senderId, receiverId: receiver.id },
-              { senderId: receiver.id, receiverId: senderId },
-            ],
-          },
-          order: [["createdAt", "ASC"]],
-        });
-
-        socket.emit("loadPrivateMessages", messages);
-      } catch (error) {
-        console.error("Error starting chat:", error);
+        // Emit "stoppedTyping" event to the private room
+        io.to(privateRoom).emit("stoppedTyping", senderPhoneNumber);
       }
-    });
-
-    socket.on("sendPrivateMessage", async ({ senderId, receiverPhoneNumber, message }) => {
-      try {
-        const receiver = await Users.findOne({ where: { phoneNumber: receiverPhoneNumber } });
-  
-        if (!receiver) {
-          socket.emit("error", "Receiver not found");
-          return;
-        }
-  
-        const newMessage = await PrivateMessage.create({
-          senderId,
-          receiverId: receiver.id,
-          message,
-        });
-  
-        const privateRoom = [senderId, receiver.id].sort().join("-");
-  
-        io.to(privateRoom).emit("privateMessage", newMessage);
-  
-        // Send notification to receiver
-        socket.broadcast.to(receiver.id.toString()).emit("notification", {
-          type: "private",
-          senderId,
-          message: newMessage,
-        });
-      } catch (error) {
-        console.error("Error sending private message:", error);
-      }
-    });
-  
-    socket.on("deletePrivateMessage", async ({ messageId, senderId }) => {
-      try {
-        const message = await PrivateMessage.findByPk(messageId);
-  
-        if (!message) {
-          socket.emit("error", "Message not found");
-          return;
-        }
-  
-        if (message.senderId !== senderId) {
-          socket.emit("error", "You can only delete your own messages");
-          return;
-        }
-  
-        await message.destroy();
-  
-        const privateRoom = [message.senderId, message.receiverId].sort().join("-");
-        io.to(privateRoom).emit("deleteMessage", { messageId });
-      } catch (error) {
-        console.error("Error deleting private message:", error);
-        socket.emit("error", "Error deleting private message");
-      }
-    });
-
-    socket.on("userTyping", ({ senderId, receiverId }) => {
-      const privateRoomSenderToReceiver = [senderId, receiverId]
-        .sort()
-        .join("-");
-      const privateRoomReceiverToSender = [receiverId, senderId]
-        .sort()
-        .join("-");
-
-      io.to(privateRoomSenderToReceiver).emit("typing", senderId);
-      io.to(privateRoomReceiverToSender).emit("typing", senderId);
-    });
-
-    socket.on("userStoppedTyping", ({ senderId, receiverId }) => {
-      const privateRoomSenderToReceiver = [senderId, receiverId]
-        .sort()
-        .join("-");
-      const privateRoomReceiverToSender = [receiverId, senderId]
-        .sort()
-        .join("-");
-
-      io.to(privateRoomSenderToReceiver).emit("stoppedTyping", senderId);
-      io.to(privateRoomReceiverToSender).emit("stoppedTyping", senderId);
-    });
-
-    // WebRTC Signaling
-
-    // socket.on("offer", async (data) => {
-    //   const { senderId, receiverPhoneNumber, offer } = data;
-
-    //   const receiver = await Users.findOne({
-    //     where: { phoneNumber: receiverPhoneNumber },
-    //   });
-
-    //   if (!receiver) {
-    //     socket.emit("error", "Receiver not found");
-    //     return;
-    //   }
-    //   io.to(receiver.id.toString()).emit("offer", { senderId, offer });
-    // });
-
-    // socket.on("answer", async (data) => {
-    //   const { senderId, receiverPhoneNumber, answer } = data;
-
-    //   const receiver = await Users.findOne({
-    //     where: { phoneNumber: receiverPhoneNumber },
-    //   });
-
-    //   if (!receiver) {
-    //     socket.emit("error", "Receiver not found");
-    //     return;
-    //   }
-
-    //   io.to(senderId.toString()).emit("answer", {
-    //     receiverId: receiver.id,
-    //     answer,
-    //   });
-    // });
-
-    // socket.on("ice-candidate", async (data) => {
-    //   const { senderId, receiverPhoneNumber, candidate } = data;
-
-    //   const receiver = await Users.findOne({
-    //     where: { phoneNumber: receiverPhoneNumber },
-    //   });
-
-    //   if (!receiver) {
-    //     socket.emit("error", "Receiver not found");
-    //     return;
-    //   }
-
-    //   io.to(receiver.id.toString()).emit("ice-candidate", {
-    //     senderId,
-    //     candidate,
-    //   });
-    // });
+    );
 
     socket.on("disconnect", () => {
       console.log("User disconnected");

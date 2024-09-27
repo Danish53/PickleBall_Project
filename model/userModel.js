@@ -97,6 +97,18 @@ const Users = sequelize.define(
     profileAvatar: {
       type: DataTypes.STRING,
     },
+    government_issue_image:{
+      type: DataTypes.STRING,
+      defaultValue: true,
+    },
+    certificate:{
+      type: DataTypes.STRING,
+      defaultValue: true,
+    },
+    status_verify:{
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
     banned: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,

@@ -28,7 +28,10 @@ import { checkBannedUser } from "../middleware/bannedUser.js";
 const router = express.Router();
 
 // user
-router.post("/register", register);
+router.post("/register", upload.fields([
+  { name: 'government_issue_image', maxCount: 1 },
+  { name: 'certificate', maxCount: 1 },
+]), register);
 router.post("/login", login);
 router.post("/forgot-password", forgotPassword);
 router.post("/verify-otp", verifyOtp);

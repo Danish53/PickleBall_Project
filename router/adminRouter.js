@@ -6,6 +6,8 @@ import {
   deleteUser,
   getAdminProfile,
   getAllUsers,
+  getNotificationsAdmin,
+  markNotificationAsRead,
   unbanUser,
   updateAdminProfile,
   updateProfile,
@@ -64,5 +66,8 @@ routerAdmin.delete(
   deleteCategory
 );
 routerAdmin.get("/listCategory", isAdmin, listCategories);
+routerAdmin.get("/allNotifications", isAdmin, getNotificationsAdmin);
+routerAdmin.post("/notifications/mark-as-read", isAdmin, markNotificationAsRead);
+
 
 export default routerAdmin;

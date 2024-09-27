@@ -1,8 +1,8 @@
 import { DataTypes } from "sequelize";
 import { sequelize } from "../database/dbConnection.js";
 
-const Message = sequelize.define(
-  "Message",
+const Notifications = sequelize.define(
+  "Notifications",
   {
     id: {
       type: DataTypes.INTEGER,
@@ -12,12 +12,9 @@ const Message = sequelize.define(
     userId: {
       type: DataTypes.INTEGER,
     },
-    userPhoneNumber: {
-      type: DataTypes.STRING,
-    },
-    groupId: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
+    isRead: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
     },
     message: {
       type: DataTypes.TEXT,
@@ -29,4 +26,4 @@ const Message = sequelize.define(
   }
 );
 
-export { Message };
+export { Notifications };

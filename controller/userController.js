@@ -7,6 +7,7 @@ import bcrypt from "bcrypt";
 import { Op } from "sequelize";
 import jwt from "jsonwebtoken";
 import nodemailer from "nodemailer";
+import { Notifications } from "../model/NotificationAdmin.js";
 // import { sendResetEmail } from "../utils/sendMailer.js";
 
 // User
@@ -23,12 +24,14 @@ export const register = asyncErrors(async (req, res, next) => {
     confirmPassword,
   } = req.body;
 
+  
+  console.log(userName);
   if (
     !userName ||
     !email ||
     !phoneNumber ||
     !userType ||
-    // !courtName ||
+    !courtName ||
     !latitude ||
     !longitude ||
     !password ||
@@ -36,6 +39,20 @@ export const register = asyncErrors(async (req, res, next) => {
   ) {
     return next(new ErrorHandler("Please fill full details!", 400));
   }
+
+    // File upload
+    const government_issue_image = req.files?.government_issue_image?.[0];
+    const certificate = req.files?.certificate?.[0];
+
+  if (userType === "Coach") {
+    if (!government_issue_image) {
+      return next(new ErrorHandler("Please select government_issue_image!", 400));
+    }
+    if (!certificate) {
+      return next(new ErrorHandler("Please choose certificate!", 400));
+    }
+  }
+  
 
   if (userName.length < 3) {
     return next(
@@ -59,6 +76,7 @@ export const register = asyncErrors(async (req, res, next) => {
     return next(new ErrorHandler("Password do not matched!", 400));
   }
 
+
   try {
     let user = await Users.findOne({ where: { email } });
     if (user) {
@@ -74,6 +92,20 @@ export const register = asyncErrors(async (req, res, next) => {
       courtName,
       latitude,
       longitude,
+    });
+
+    if (government_issue_image) {
+      user.government_issue_image = government_issue_image.path;
+    }
+    if (certificate) {
+      user.certificate = certificate.path;
+    }
+
+    await user.save();
+
+    await Notifications.create({
+      userId: user.id,
+      message: `New user registered: ${userName} (${email})`,
     });
 
     //   res.status(200).json({
@@ -692,7 +724,6 @@ export const unbanUser = asyncErrors(async (req, res, next) => {
 
     await sendUnBanNotification(user);
 
-
     res.status(200).json({
       success: true,
       message: "User unbanned successfully",
@@ -703,3 +734,48 @@ export const unbanUser = asyncErrors(async (req, res, next) => {
     res.status(500).json({ message: "Internal Server Error", error });
   }
 });
+
+export const getNotificationsAdmin = asyncErrors(async (req, res, next) => {
+  try {
+    const notifications = await Notifications.findAll({
+      where: { isRead: false },
+      order: [['createdAt', 'DESC']],
+    });
+
+    res.status(200).json({
+      success: true,
+      notifications,
+    });
+  } catch (error) {
+    // return next(new ErrorHandler(error.message, 500)); 
+    res.status(500).json({ message: "Internal Server Error", error });
+  }
+});
+
+
+export const markNotificationAsRead = asyncErrors(async (req, res, next) => {
+  try {
+    const { id } = req.body;
+
+    const notification = await Notifications.findOne({ where: { id } });
+
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        message: 'Notification not found',
+      });
+    }
+
+    await Notifications.update({ isRead: true }, { where: { id } });
+
+    res.status(200).json({
+      success: true,
+      message: 'Notification marked as read',
+      notification,
+    });
+  } catch (error) {
+    return next(new ErrorHandler(error.message, 500));
+  }
+});
+
+

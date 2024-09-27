@@ -1,6 +1,6 @@
 <!-- group -->
 <!DOCTYPE html>
-<!-- <html lang="en">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -61,7 +61,7 @@
             // const socket = io();
             const socket = io.connect('http://localhost:8000', {
     auth: {
-        token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTUsImVtYWlsIjoiYXdhaXNAZ21haWwuY29tIiwiaWF0IjoxNzIwNzY3MTI2LCJleHAiOjE3MjMzNTkxMjZ9.HCMW52wMbUchG1R3Jf5wS8a3y2ntr5GSWh5kNQW73ao'
+        token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NjQsImVtYWlsIjoidXNlcmRlbW9AZ21haWwuY29tIiwiaWF0IjoxNzI3NDE2NjQ5LCJleHAiOjE3MzAwMDg2NDl9.lLia3atXhVMiY2hAcf3GWCPA1aX1c79n1nukYZbhlK0'
     }
     
 });
@@ -73,29 +73,29 @@
             const notifications = document.getElementById('notifications');
 
             const groupId = prompt("Enter Group ID:", "58");
-            const userId = prompt("Enter User ID:", "49");
+            const userPhoneNumber = prompt("Enter User phone number:", "423434786");
 
-            socket.emit('joinGroup', { groupId, userId });
+            socket.emit('joinGroup', { groupId, userPhoneNumber });
 
             socket.on('loadMessages', (messages) => {
                 messageList.innerHTML = '';
                 messages.forEach(msg => {
                     const messageElement = document.createElement('div');
-                    messageElement.textContent = `${msg.userId}: ${msg.message}`;
+                    messageElement.textContent = `${msg.userPhoneNumber}: ${msg.message}`;
                     messageList.appendChild(messageElement);
                 });
             });
 
             socket.on('message', (msg) => {
                 const messageElement = document.createElement('div');
-                messageElement.textContent = `${msg.userId}: ${msg.message}`;
+                messageElement.textContent = `${msg.userPhoneNumber}: ${msg.message}`;
                 messageList.appendChild(messageElement);
             });
 
             sendMessageButton.addEventListener('click', () => {
                 const message = messageInput.value;
                 if (message.trim() !== '') {
-                    socket.emit('sendMessage', { groupId, userId, message });
+                    socket.emit('sendMessage', { groupId, userPhoneNumber, message });
                     messageInput.value = '';
                 }
             });
@@ -109,159 +109,207 @@
         });
     </script>
 </body>
-</html> -->
+</html>
 
 <!-- one to one chat -->
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Private Chat</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-        }
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+      }
 
-        #chatPage {
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-        }
+      #chatPage {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
 
-        #messageList {
-            flex: 1;
-            overflow-y: auto;
-            padding: 10px;
-            border: 1px solid #ccc;
-            margin-bottom: 10px;
-        }
+      #messageList {
+        flex: 1;
+        overflow-y: auto;
+        padding: 10px;
+        border: 1px solid #ccc;
+        margin-bottom: 10px;
+      }
 
-        #messageInput, #sendMessageButton {
-            padding: 10px;
-        }
+      #messageInput,
+      #sendMessageButton {
+        padding: 10px;
+      }
 
-        #messageInput {
-            width: calc(100% - 80px);
-        }
+      #messageInput {
+        width: calc(100% - 80px);
+      }
 
-        #sendMessageButton {
-            width: 60px;
-        }
+      #sendMessageButton {
+        width: 60px;
+      }
 
-        .notification {
-            background-color: #ffef96;
-            padding: 10px;
-            border: 1px solid #ccc;
-            margin-bottom: 10px;
-        }
+      .deleteButton {
+        margin-left: 10px;
+        padding: 5px;
+        background-color: red;
+        color: white;
+        border: none;
+        cursor: pointer;
+      }
 
-        #typingIndicator {
-            display: none;
-            font-style: italic;
-            color: #888;
-        }
+      .deleteButton:hover {
+        background-color: darkred;
+      }
+
+      .notification {
+        background-color: #aa993e;
+        padding: 10px;
+        border: 1px solid #ccc;
+        margin-bottom: 10px;
+      }
+
+      #typingIndicator {
+        display: none;
+        font-style: italic;
+        color: #888;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div id="chatPage">
-        <h2>Private Chat</h2>
-        <div id="messageList"></div>
-        <input type="text" id="messageInput" placeholder="Type a message...">
-        <button id="sendMessageButton">Send</button>
-        <div id="typingIndicator">User is typing...</div>
-        <div id="notifications"></div>
+      <h2>Private Chat</h2>
+      <div id="messageList"></div>
+      <input type="text" id="messageInput" placeholder="Type a message..." />
+      <button id="sendMessageButton">Send</button>
+      <div id="typingIndicator">User is typing...</div>
+      <div id="notifications"></div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // const socket = io();
-
-            const socket = io.connect('http://localhost:8000', {
-    auth: {
-        token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NTUsImVtYWlsIjoiYXdhaXNAZ21haWwuY29tIiwiaWF0IjoxNzIwNzY3MTI2LCJleHAiOjE3MjMzNTkxMjZ9.HCMW52wMbUchG1R3Jf5wS8a3y2ntr5GSWh5kNQW73ao'
-    }
-});
-
-
-            const messageList = document.getElementById('messageList');
-            const messageInput = document.getElementById('messageInput');
-            const sendMessageButton = document.getElementById('sendMessageButton');
-            const typingIndicator = document.getElementById('typingIndicator');
-            const notifications = document.getElementById('notifications');
-
-            const senderId = prompt("Enter your User ID:", "44");
-            const receiverPhoneNumber = prompt("Enter receiver's phone number:", "123123123");
-
-            socket.emit('startChat', { senderId, receiverPhoneNumber });
-
-            socket.on('loadPrivateMessages', (messages) => {
-                messageList.innerHTML = '';
-                messages.forEach(msg => {
-                    displayMessage(msg);
-                });
-            });
-
-            messageInput.addEventListener('input', () => {
-                socket.emit('userTyping', { senderId, receiverId });
-            });
-
-            messageInput.addEventListener('blur', () => {
-                socket.emit('userStoppedTyping', { senderId, receiverId });
-            });
-
-            socket.on('typing', (typingSenderId) => {
-                if (typingSenderId === senderId) {
-                    typingIndicator.style.display = 'block';
-                }
-            });
-
-            socket.on('stoppedTyping', (typingSenderId) => {
-                if (typingSenderId === senderId) {
-                    typingIndicator.style.display = 'none';
-                }
-            });
-
-            sendMessageButton.addEventListener('click', () => {
-                const message = messageInput.value;
-                if (message.trim() !== '') {
-                    socket.emit('sendPrivateMessage', { senderId, receiverPhoneNumber, message });
-                    messageInput.value = '';
-                }
-            });
-
-            socket.on('privateMessage', (msg) => {
-                displayMessage(msg);
-            });
-
-            socket.on('notification', (notification) => {
-                const notificationElement = document.createElement('div');
-                notificationElement.className = 'notification';
-                notificationElement.textContent = `New private message from ${notification.senderId}: ${notification.message.message}`;
-                notifications.appendChild(notificationElement);
-            });
-
-            socket.on('disconnect', () => {
-                socket.emit('userDisconnect', senderId);
-            });
-            
-
-            // Function to display message in messageList
-            function displayMessage(msg) {
-                const messageElement = document.createElement('div');
-                messageElement.textContent = `${msg.senderId}: ${msg.message}`;
-                messageList.appendChild(messageElement);
-            }
+      document.addEventListener("DOMContentLoaded", () => {
+        const socket = io.connect("http://localhost:8000", {
+          auth: {
+            token:
+              "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NjQsImVtYWlsIjoidXNlcmRlbW9AZ21haWwuY29tIiwiaWF0IjoxNzI3NDE2NjQ5LCJleHAiOjE3MzAwMDg2NDl9.lLia3atXhVMiY2hAcf3GWCPA1aX1c79n1nukYZbhlK0",
+          },
         });
+
+        const messageList = document.getElementById("messageList");
+        const messageInput = document.getElementById("messageInput");
+        const sendMessageButton = document.getElementById("sendMessageButton");
+        const typingIndicator = document.getElementById("typingIndicator");
+        const notifications = document.getElementById("notifications");
+
+        const senderPhoneNumber = prompt(
+          "Enter your phone number:",
+          "123123123"
+        );
+        const receiverPhoneNumber = prompt(
+          "Enter receiver's phone number:",
+          "456456456"
+        );
+
+        // Start chat
+        socket.emit("startChat", { senderPhoneNumber, receiverPhoneNumber });
+
+        // Load previous messages
+        socket.on("loadPrivateMessages", (messages) => {
+          messageList.innerHTML = "";
+          messages.forEach((msg) => {
+            displayMessage(msg);
+          });
+        });
+
+        socket.on("deleteMessage", ({ messageId }) => {
+          const messageElement = messageList.querySelector(
+            `[data-message-id="${messageId}"]`
+          );
+          if (messageElement) {
+            messageList.removeChild(messageElement);
+          }
+        });
+
+        // Typing events
+        messageInput.addEventListener("input", () => {
+          socket.emit("userTyping", { senderPhoneNumber, receiverPhoneNumber });
+        });
+
+        messageInput.addEventListener("blur", () => {
+          socket.emit("userStoppedTyping", {
+            senderPhoneNumber,
+            receiverPhoneNumber,
+          });
+        });
+
+        // Show typing indicator
+        socket.on("typing", (typingSenderPhoneNumber) => {
+          if (typingSenderPhoneNumber !== senderPhoneNumber) {
+            typingIndicator.style.display = "block";
+          }
+        });
+
+        // Hide typing indicator
+        socket.on("stoppedTyping", (typingSenderPhoneNumber) => {
+          if (typingSenderPhoneNumber !== senderPhoneNumber) {
+            typingIndicator.style.display = "none";
+          }
+        });
+
+        // Send message
+        sendMessageButton.addEventListener("click", () => {
+          const message = messageInput.value;
+          if (message.trim() !== "") {
+            socket.emit("sendPrivateMessage", {
+              senderPhoneNumber,
+              receiverPhoneNumber,
+              message,
+            });
+            messageInput.value = "";
+          }
+        });
+
+        // Display received private message
+        socket.on("privateMessage", (msg) => {
+          displayMessage(msg);
+        });
+
+        // Show notification
+        socket.on("notification", (notification) => {
+          const notificationElement = document.createElement("div");
+          notificationElement.className = "notification";
+          notificationElement.textContent = `New private message from ${notification.senderPhoneNumber}: ${notification.message.message}`;
+          notifications.appendChild(notificationElement);
+        });
+
+        // Function to display message in messageList
+        function displayMessage(msg) {
+          const messageElement = document.createElement("div");
+          messageElement.textContent = `${msg.senderPhoneNumber}: ${msg.message}`;
+          messageElement.setAttribute("data-message-id", msg.id);
+
+          // Create delete button
+          const deleteButton = document.createElement("button");
+          deleteButton.textContent = "Delete";
+          deleteButton.className = "deleteButton";
+          deleteButton.onclick = () => {
+            // Emit delete request to server
+            socket.emit("deletePrivateMessage", {
+              messageId: msg.id,
+              senderPhoneNumber: msg.senderPhoneNumber,
+            });
+          };
+
+          // Append message and delete button to message element
+          messageElement.appendChild(deleteButton);
+          messageList.appendChild(messageElement);
+        }
+      });
     </script>
-</body>
-</html>
-
-
-
-
-
+  </body>
+</html> -->
 
