@@ -16,7 +16,8 @@ import { isSocketAuthenticated } from "./middleware/socketAuthentication.js";
 import productroutes from "./router/marketPlaceRouter.js";
 
 const app = express();
-dotenv.config({ path: "./.env" });
+const a = dotenv.config({ path: "./.env" });
+console.log(a, "a");
 console.log("Database User:", process.env.MYSQL_USER);
 
 const server = http.createServer(app);
