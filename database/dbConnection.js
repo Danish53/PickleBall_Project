@@ -4,6 +4,7 @@ import { config } from 'dotenv';
 config(); 
 
 // Initialize Sequelize with environment variables
+console.log(process.env.MYSQL_USER, 'nameeeeeee');
 const sequelize = new Sequelize(
   process.env.DB_NAME,
   process.env.MYSQL_USER,
