@@ -59,10 +59,9 @@ app.use((req, res, next) => {
   next();
 });
 
-// app.get("/", function(req, res){
-//    res.sendFile(__dirname + "/index.html"); 
-//    console.log(__dirname, 'dirname');
-// });
+app.get("/", function(req, res){
+   res.sendFile(__dirname + "/public/index.html"); 
+});
 
 //routes
 
