@@ -60,7 +60,7 @@ app.use((req, res, next) => {
 });
 
 app.get("/", function(req, res){
-   res.sendFile(__dirname + "/public/index.html"); 
+   res.sendFile(__dirname + "/index.html"); 
 });
 
 //routes
