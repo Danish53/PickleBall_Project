@@ -16,7 +16,7 @@ import { isSocketAuthenticated } from "./middleware/socketAuthentication.js";
 import productroutes from "./router/marketPlaceRouter.js";
 
 const app = express();
-dotenv.config({ path: "./.env" });
+dotenv.config({ path: ".env" });
 
 const server = http.createServer(app);
 const io = new Server(server);
@@ -83,7 +83,7 @@ initSocket(io);
 
 io.use(isSocketAuthenticated);
 
-server.listen(process.env.PORT, () => {
+server.listen(process.env.PORT || 3000, () => {
   console.log(`Server running on port ${process.env.PORT}`);
 });
  

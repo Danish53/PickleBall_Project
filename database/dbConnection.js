@@ -20,7 +20,7 @@ const dbConnection = async () => {
     await sequelize.authenticate();
     console.log("Connected to database!!");
   } catch (err) {
-    console.log(`Some error occurred while connecting to database: ${err}`);
+    console.log(`Some error occurred while connecting to database: ${err.message}`);
   }
 };
 
