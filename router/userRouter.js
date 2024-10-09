@@ -41,7 +41,7 @@ router.get("/logout", isAuthenticated, logout);
 router.get("/getprofile", isAuthenticated, checkBannedUser, getProfile);
 router.put(
   "/profile/:id", 
-  isAuthenticated, checkBannedUser,
+  isAuthenticated, checkBannedUser, 
   upload.single("profileAvatar"),
   updateProfile
 );

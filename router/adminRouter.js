@@ -60,8 +60,8 @@ routerAdmin.patch("/banUser/:userId", isAdmin, banUser);
 routerAdmin.patch("/unbanUser/:userId", isAdmin, unbanUser);
 //marketPlace
 routerAdmin.post("/addCategory", isAdmin, addCategory);
-routerAdmin.delete(
-  "/deleteCategory/:categoryId",
+routerAdmin.delete( 
+  "/deleteCategory/:categoryId",  
   isAdmin,
   deleteCategory
 );

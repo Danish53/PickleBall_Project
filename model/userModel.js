@@ -24,7 +24,7 @@ const validateLongitude = (value) => {
 };
 
 const Users = sequelize.define(
-  "User",
+  "Users",
   {
     id: {
       type: DataTypes.INTEGER,
@@ -149,9 +149,9 @@ Users.prototype.getJWTToken = function () {
     { id: this.id, email: this.email },
     process.env.JWT_SECRET_KEY,
     {
-      expiresIn: process.env.EXPIRES_jWT,
+      expiresIn: process.env.EXPIRES_jWT?.trim() || "7d",
     }
   );
 };
-
+ 
 export { Users };
