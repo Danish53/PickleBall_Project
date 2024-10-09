@@ -10,111 +10,111 @@ import { Notifications } from "../model/NotificationAdmin.js";
 // import { sendResetEmail } from "../utils/sendMailer.js";
 
 // User
-// export const register = asyncErrors(async (req, res, next) => {
-//   const {
-//     userName,
-//     email,
-//     phoneNumber,
-//     userType,
-//     courtName,
-//     latitude,
-//     longitude,
-//     password,
-//     confirmPassword,
-//   } = req.body;
+export const register = asyncErrors(async (req, res, next) => {
+  const {
+    userName,
+    email,
+    phoneNumber,
+    userType,
+    courtName,
+    latitude,
+    longitude,
+    password,
+    confirmPassword,
+  } = req.body;
 
   
-//   if (
-//     !userName ||
-//     !email ||
-//     !phoneNumber ||
-//     !userType ||
-//     !courtName ||
-//     !latitude ||
-//     !longitude ||
-//     !password ||
-//     !confirmPassword
-//   ) {
-//     return next(new ErrorHandler("Please fill full details!", 400));
-//   }
+  if (
+    !userName ||
+    !email ||
+    !phoneNumber ||
+    !userType ||
+    !courtName ||
+    !latitude ||
+    !longitude ||
+    !password ||
+    !confirmPassword
+  ) {
+    return next(new ErrorHandler("Please fill full details!", 400));
+  }
 
-//     // File upload
-//     const government_issue_image = req.files?.government_issue_image?.[0];
-//     const certificate = req.files?.certificate?.[0];
+    // File upload
+    const government_issue_image = req.files?.government_issue_image?.[0];
+    const certificate = req.files?.certificate?.[0];
 
-//   if (userType === "Coach") {
-//     if (!government_issue_image) {
-//       return next(new ErrorHandler("Please select government_issue_image!", 400));
-//     }
-//     if (!certificate) {
-//       return next(new ErrorHandler("Please choose certificate!", 400));
-//     }
-//   }
+  if (userType === "Coach") {
+    if (!government_issue_image) {
+      return next(new ErrorHandler("Please select government_issue_image!", 400));
+    }
+    if (!certificate) {
+      return next(new ErrorHandler("Please choose certificate!", 400));
+    }
+  }
   
 
-//   if (userName.length < 3) {
-//     return next(
-//       new ErrorHandler("Username must contain at least 3 characters!", 400)
-//     );
-//   }
+  if (userName.length < 3) {
+    return next(
+      new ErrorHandler("Username must contain at least 3 characters!", 400)
+    );
+  }
 
-//   if (courtName && courtName.length < 3) {
-//     return next(
-//       new ErrorHandler("courtName must contain at least 3 characters!", 400)
-//     );
-//   }
+  if (courtName && courtName.length < 3) {
+    return next(
+      new ErrorHandler("courtName must contain at least 3 characters!", 400)
+    );
+  }
 
-//   if (userType === "admin") {
-//     return next(
-//       new ErrorHandler("Admin cannot register through this form!", 400)
-//     );
-//   }
+  if (userType === "admin") {
+    return next(
+      new ErrorHandler("Admin cannot register through this form!", 400)
+    );
+  }
 
-//   if (password !== confirmPassword) {
-//     return next(new ErrorHandler("Password do not matched!", 400));
-//   }
+  if (password !== confirmPassword) {
+    return next(new ErrorHandler("Password do not matched!", 400));
+  }
 
 
-//   try {
-//     let user = await Users.findOne({ where: { email } });
-//     if (user) {
-//       return next(new ErrorHandler("User already exists", 400));
-//     }
+  try {
+    let user = await Users.findOne({ where: { email } });
+    if (user) {
+      return next(new ErrorHandler("User already exists", 400));
+    }
 
-//     user = await Users.create({
-//       userName,
-//       email,
-//       password,
-//       phoneNumber,
-//       userType,
-//       courtName,
-//       latitude,
-//       longitude,
-//     });
+    user = await Users.create({
+      userName,
+      email,
+      password,
+      phoneNumber,
+      userType,
+      courtName,
+      latitude,
+      longitude,
+    });
 
-//     if (government_issue_image) {
-//       user.government_issue_image = government_issue_image.path;
-//     }
-//     if (certificate) {
-//       user.certificate = certificate.path;
-//     }
+    if (government_issue_image) {
+      user.government_issue_image = government_issue_image.path;
+    }
+    if (certificate) {
+      user.certificate = certificate.path;
+    }
 
-//     await user.save();
+    await user.save();
 
-//     await Notifications.create({
-//       userId: user.id,
-//       message: `New user registered: ${userName} (${email})`,
-//     });
+    await Notifications.create({
+      userId: user.id,
+      message: `New user registered: ${userName} (${email})`,
+    });
 
-//       res.status(200).json({
-//         success: true,
-//         message: "User registered successfully",
-//       });
-//     // sendToken(user, 200, "User registered successfully", res);
-//   } catch (error) {
-//     return next(new ErrorHandler(error.message, 500));
-//   }
-// });
+      res.status(200).json({
+        success: true,
+        message: "User registered successfully",
+      });
+    // sendToken(user, 200, "User registered successfully", res);
+  } catch (error) {
+    return next(new ErrorHandler(error.message, 500));
+  }
+});
 
 export const login = asyncErrors(async (req, res, next) => {
   const { email, password } = req.body;
