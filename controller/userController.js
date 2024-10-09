@@ -5,7 +5,6 @@ import { sendToken } from "../utils/jwtToken.js";
 import { Users } from "../model/userModel.js";
 import bcrypt from "bcrypt";
 import { Op } from "sequelize";
-import jwt from "jsonwebtoken";
 import nodemailer from "nodemailer";
 import { Notifications } from "../model/NotificationAdmin.js";
 // import { sendResetEmail } from "../utils/sendMailer.js";
@@ -25,7 +24,6 @@ export const register = asyncErrors(async (req, res, next) => {
   } = req.body;
 
   
-  console.log(userName);
   if (
     !userName ||
     !email ||
@@ -108,11 +106,11 @@ export const register = asyncErrors(async (req, res, next) => {
       message: `New user registered: ${userName} (${email})`,
     });
 
-    //   res.status(200).json({
-    //     success: true,
-    //     message: "User registered successfully",
-    //   });
-    sendToken(user, 200, "User registered successfully", res);
+      res.status(200).json({
+        success: true,
+        message: "User registered successfully",
+      });
+    // sendToken(user, 200, "User registered successfully", res);
   } catch (error) {
     return next(new ErrorHandler(error.message, 500));
   }
