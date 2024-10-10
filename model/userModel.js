@@ -24,7 +24,7 @@ const validateLongitude = (value) => {
 };
 
 const Users = sequelize.define(
-  "Users",
+  "users",
   {
     id: {
       type: DataTypes.INTEGER,
@@ -145,23 +145,12 @@ Users.prototype.comparePassword = async function (enteredPassword) {
 };
 
 Users.prototype.getJWTToken = function () {
-  const expiresIn = process.env.EXPIRES_jWT?.trim() || "1h";
-
-    const isValidNumber = /^\d+$/.test(expiresIn); // Check if it's a number
-    const isValidString = /^(?:\d+)(?:s|m|h|d)$/.test(expiresIn); // Check if it's a valid string representation
-
-    if (!isValidNumber && !isValidString) {
-        throw new Error(`Invalid expiresIn value: ${expiresIn}. It should be a number of seconds or a string representing a timespan (e.g., "60s", "2h").`);
-    }
-
-    console.log('Generating token with expiresIn:', expiresIn);
-
   return jwt.sign(
-      { id: this.id, email: this.email },
-      process.env.JWT_SECRET_KEY,
-      {
-          expiresIn: 111,
-      }
+    { id: this.id, email: this.email },
+    process.env.JWT_SECRET_KEY,
+    {
+      expiresIn: process.env.EXPIRES_jWT,
+    }
   );
 };
 

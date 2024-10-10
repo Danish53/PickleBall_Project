@@ -2,7 +2,7 @@ import { DataTypes } from "sequelize";
 import { sequelize } from "../database/dbConnection.js";
 
 const Category = sequelize.define(
-  "Category",
+  "Categories",
   {
     id: {
       type: DataTypes.INTEGER,

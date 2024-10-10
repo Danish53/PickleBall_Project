@@ -2,7 +2,7 @@ import { DataTypes } from "sequelize";
 import { sequelize } from "../database/dbConnection.js";
 
 const uploadProduct = sequelize.define(
-  "uploadProduct",
+  "uploadProducts",
   {
     id: {
       type: DataTypes.INTEGER,

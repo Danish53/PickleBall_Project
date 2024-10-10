@@ -2,7 +2,7 @@ import { DataTypes } from "sequelize";
 import { sequelize } from "../database/dbConnection.js";
 
 const Schedule = sequelize.define(
-  "Schedule",
+  "Schedules",
   {
     coachId: {
       type: DataTypes.INTEGER,

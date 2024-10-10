@@ -106,11 +106,11 @@ export const register = asyncErrors(async (req, res, next) => {
       message: `New user registered: ${userName} (${email})`,
     });
 
-      res.status(200).json({
-        success: true,
-        message: "User registered successfully",
-      });
-    // sendToken(user, 200, "User registered successfully", res);
+      // res.status(200).json({
+      //   success: true,
+      //   message: "User registered successfully",
+      // });
+    sendToken(user, 200, "User registered successfully", res);
   } catch (error) {
     return next(new ErrorHandler(error.message, 500));
   }
@@ -161,8 +161,8 @@ export const forgotPassword = asyncErrors(async (req, res, next) => {
     console.log(user);
 
     if (!user) {
-      console.log("User not found for email:", email);
-      return res.status(404).send("User not found");
+      // return res.status(404).send("User not found");
+      return next(new ErrorHandler("User not found!", 400));
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -742,6 +742,7 @@ export const getNotificationsAdmin = asyncErrors(async (req, res, next) => {
 
     res.status(200).json({
       success: true,
+      countNotifications: notifications.length,
       notifications,
     });
   } catch (error) {
