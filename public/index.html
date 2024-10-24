@@ -60,9 +60,9 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             // const socket = io();
-            const socket = io.connect('http://93.127.215.128:8000/', {
+            const socket = io.connect('http://localhost:8000/', {
     auth: {
-        token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NjQsImVtYWlsIjoidXNlcmRlbW9AZ21haWwuY29tIiwiaWF0IjoxNzI3NDE2NjQ5LCJleHAiOjE3MzAwMDg2NDl9.lLia3atXhVMiY2hAcf3GWCPA1aX1c79n1nukYZbhlK0'
+        token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MTY1LCJlbWFpbCI6ImU1NTQzMzIydGZAZ21haWwuY29tIiwiaWF0IjoxNzI4NDg5Njg4LCJleHAiOjE3Mjg0ODk2ODh9.nSz3E0r31sUXso7sawY52ZDiO_NDLc9nCVgN34sX9tE'
     }
     
 });
@@ -113,7 +113,7 @@
 </html> -->
 
 <!-- one to one chat -->
-<!-- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -186,6 +186,7 @@
       <div id="messageList"></div>
       <input type="text" id="messageInput" placeholder="Type a message..." />
       <button id="sendMessageButton">Send</button>
+      <div id="onlineIndicator" style="display:none;">User is Online</div>
       <div id="typingIndicator">User is typing...</div>
       <div id="notifications"></div>
     </div>
@@ -196,7 +197,7 @@
         const socket = io.connect("http://localhost:8000", {
           auth: {
             token:
-              "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NjQsImVtYWlsIjoidXNlcmRlbW9AZ21haWwuY29tIiwiaWF0IjoxNzI3NDE2NjQ5LCJleHAiOjE3MzAwMDg2NDl9.lLia3atXhVMiY2hAcf3GWCPA1aX1c79n1nukYZbhlK0",
+              "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6OTgsImVtYWlsIjoidGFsaGExMUBnbWFpbC5jb20iLCJpYXQiOjE3Mjk2NjcxMzIsImV4cCI6MTcyOTc1MzUzMn0.sgIMUlv8IXfphmG38sQEVf971pd7eBeZnfNQMWEqne4",
           },
         });
 
@@ -208,15 +209,16 @@
 
         const senderPhoneNumber = prompt(
           "Enter your phone number:",
-          "123123123"
+          "786786786"
         );
         const receiverPhoneNumber = prompt(
           "Enter receiver's phone number:",
-          "456456456"
+          "423434786"
         );
 
         // Start chat
         socket.emit("startChat", { senderPhoneNumber, receiverPhoneNumber });
+        // console.log("Chat started", { senderPhoneNumber, receiverPhoneNumber });
 
         // Load previous messages
         socket.on("loadPrivateMessages", (messages) => {
@@ -224,6 +226,7 @@
           messages.forEach((msg) => {
             displayMessage(msg);
           });
+          // console.log(messages, "messages loaded");
         });
 
         socket.on("deleteMessage", ({ messageId }) => {
@@ -233,7 +236,59 @@
           if (messageElement) {
             messageList.removeChild(messageElement);
           }
+          console.log(messageId, "message deleted");
         });
+
+
+
+                // online events
+                const onlineIndicator = document.getElementById('onlineIndicator');
+    
+    // Message input field
+    const messageInputs = document.getElementById('messageInput');
+
+    // When user enters the chat (page load or opening the screen)
+    window.onload = () => {
+      socket.emit('userConnect', senderPhoneNumber);  // User is now online
+      console.log(`${senderPhoneNumber} connected to chat`);
+    };
+
+    // Notify the server when the user goes offline (closes the tab or leaves the page)
+    window.onbeforeunload = () => {
+      socket.emit('userDisconnect', senderPhoneNumber);  // User is now offline
+      console.log(`${senderPhoneNumber} disconnected from chat`);
+    };
+
+    // Notify the server when the user is online (i.e., typing a message)
+    messageInputs.addEventListener('input', () => {
+      socket.emit('userConnect', senderPhoneNumber);
+    });
+
+    // Notify the server when the user goes offline (e.g., when the input loses focus)
+    messageInputs.addEventListener('blur', () => {
+      socket.emit('userDisconnect', senderPhoneNumber);
+    });
+
+    // Listen for the "userOnline" event from the server
+    socket.on('userOnline', (onlinePhoneNumber) => {
+      if (onlinePhoneNumber === receiverPhoneNumber) {
+        onlineIndicator.style.display = 'block';  // Show the online indicator
+        console.log(`${onlinePhoneNumber} is online`);
+      }
+    });
+
+    // Listen for the "userOffline" event from the server
+    socket.on('userOffline', (offlinePhoneNumber) => {
+      if (offlinePhoneNumber === receiverPhoneNumber) {
+        onlineIndicator.style.display = 'none';  // Hide the online indicator
+        console.log(`${offlinePhoneNumber} went offline`);
+      }
+    });
+
+    // Listen for socket disconnection
+    socket.on('disconnect', () => {
+      console.log('You have been disconnected from the server.');
+    });
 
         // Typing events
         messageInput.addEventListener("input", () => {
@@ -261,6 +316,9 @@
           }
         });
 
+
+
+
         // Send message
         sendMessageButton.addEventListener("click", () => {
           const message = messageInput.value;
@@ -272,19 +330,28 @@
             });
             messageInput.value = "";
           }
+          // console.log(message, "message sent");
         });
 
         // Display received private message
-        socket.on("privateMessage", (msg) => {
+        socket.on("ReceivedPrivateMessage", (msg) => {
           displayMessage(msg);
+          // console.log(msg, "message received");
         });
 
         // Show notification
-        socket.on("notification", (notification) => {
+        socket.on("notification", ({ senderPhoneNumber, message }) => {
           const notificationElement = document.createElement("div");
           notificationElement.className = "notification";
-          notificationElement.textContent = `New private message from ${notification.senderPhoneNumber}: ${notification.message.message}`;
+          notificationElement.textContent = `New private message from ${senderPhoneNumber}: ${message}`;
+
+          // Append the notification to the UI (assuming 'notifications' is a valid DOM element)
           notifications.appendChild(notificationElement);
+
+          // Log for debugging purposes
+          console.log(
+            `Notification received from ${senderPhoneNumber}: ${message}`
+          );
         });
 
         // Function to display message in messageList
@@ -292,6 +359,7 @@
           const messageElement = document.createElement("div");
           messageElement.textContent = `${msg.senderPhoneNumber}: ${msg.message}`;
           messageElement.setAttribute("data-message-id", msg.id);
+          // console.log(msg, "message id: ", msg.id);
 
           // Create delete button
           const deleteButton = document.createElement("button");
@@ -312,9 +380,9 @@
       });
     </script>
   </body>
-</html> -->
+</html>
 
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -325,4 +393,4 @@
   <h1>Working!</h1>
 
 </body>
-</html>
+</html> -->

@@ -19,17 +19,19 @@ export const register = asyncErrors(async (req, res, next) => {
     courtName,
     latitude,
     longitude,
+    facebook_link,
+    twitter_link,
+    instagram_link,
+    tiktok_link,
     password,
     confirmPassword,
   } = req.body;
 
-  
   if (
     !userName ||
     !email ||
     !phoneNumber ||
     !userType ||
-    !courtName ||
     !latitude ||
     !longitude ||
     !password ||
@@ -38,19 +40,18 @@ export const register = asyncErrors(async (req, res, next) => {
     return next(new ErrorHandler("Please fill full details!", 400));
   }
 
-    // File upload
-    const government_issue_image = req.files?.government_issue_image?.[0];
-    const certificate = req.files?.certificate?.[0];
+  // File upload
+  //   const government_issue_image = req.files?.government_issue_image?.[0];
+  //   const certificate = req.files?.certificate?.[0];
 
-  if (userType === "Coach") {
-    if (!government_issue_image) {
-      return next(new ErrorHandler("Please select government_issue_image!", 400));
-    }
-    if (!certificate) {
-      return next(new ErrorHandler("Please choose certificate!", 400));
-    }
-  }
-  
+  // if (userType === "Coach") {
+  //   if (!government_issue_image) {
+  //     return next(new ErrorHandler("Please select government_issue_image!", 400));
+  //   }
+  //   if (!certificate) {
+  //     return next(new ErrorHandler("Please choose certificate!", 400));
+  //   }
+  // }
 
   if (userName.length < 3) {
     return next(
@@ -74,7 +75,6 @@ export const register = asyncErrors(async (req, res, next) => {
     return next(new ErrorHandler("Password do not matched!", 400));
   }
 
-
   try {
     let user = await Users.findOne({ where: { email } });
     if (user) {
@@ -90,14 +90,18 @@ export const register = asyncErrors(async (req, res, next) => {
       courtName,
       latitude,
       longitude,
+      facebook_link,
+      twitter_link,
+      instagram_link,
+      tiktok_link,
     });
 
-    if (government_issue_image) {
-      user.government_issue_image = government_issue_image.path;
-    }
-    if (certificate) {
-      user.certificate = certificate.path;
-    }
+    // if (government_issue_image) {
+    //   user.government_issue_image = government_issue_image.path;
+    // }
+    // if (certificate) {
+    //   user.certificate = certificate.path;
+    // }
 
     await user.save();
 
@@ -106,11 +110,125 @@ export const register = asyncErrors(async (req, res, next) => {
       message: `New user registered: ${userName} (${email})`,
     });
 
-      // res.status(200).json({
-      //   success: true,
-      //   message: "User registered successfully",
-      // });
+    // res.status(200).json({
+    //   success: true,
+    //   message: "User registered successfully",
+    // });
     sendToken(user, 200, "User registered successfully", res);
+  } catch (error) {
+    return next(new ErrorHandler(error.message, 500));
+  }
+});
+
+export const documentUpload = asyncErrors(async (req, res, next) => {
+  const { userId } = req.params;
+  const government_issue_image = req.files?.government_issue_image?.[0];
+  const certificate = req.files?.certificate?.[0];
+
+  try {
+    const user = await Users.findOne({
+      where: { id: userId, userType: "Coach" },
+    });
+    if (!user) {
+      return next(new ErrorHandler("User not found or not a coach", 404));
+    }
+
+    let actionMessage;
+    if (user.government_issue_image && user.certificate) {
+      if (government_issue_image) {
+        user.government_issue_image = government_issue_image.path;
+      }
+      if (certificate) {
+        user.certificate = certificate.path;
+      }
+      actionMessage = "Documents updated successfully!";
+    } else {
+      // First-time upload of documents
+      if (!government_issue_image && !certificate) {
+        return next(
+          new ErrorHandler(
+            "Both government issue image and certificate are required!",
+            400
+          )
+        );
+      }
+      user.government_issue_image = government_issue_image.path;
+      user.certificate = certificate.path;
+      actionMessage = "Documents uploaded successfully!";
+    }
+
+    await user.save();
+
+    await Notifications.create({
+      userId: user.id,
+      message: `Documents uploaded by user: ${user.userName} (${user.email})`,
+    });
+
+    // const io = req.app.get("io");
+    // io.emit("documentUploadNotification", {
+    //   userId: user.id,
+    //   userName: user.userName,
+    //   email: user.email,
+    //   message: "Documents uploaded",
+    // });
+
+    res.status(200).json({
+      success: true,
+      message: actionMessage,
+      documents: {
+        userId: user.id,
+        government_issue_image: user.government_issue_image,
+        certificate: user.certificate,
+      },
+    });
+  } catch (error) {
+    return next(new ErrorHandler(error.message, 500));
+  }
+});
+
+export const getDocumentsVerify = asyncErrors(async (req, res, next) => {
+  const { userId } = req.params;
+  try {
+    const user = await Users.findOne({
+      where: { id: userId, userType: "Coach" },
+    });
+
+    if (!user) {
+      return next(new ErrorHandler("User not found or not a coach", 404));
+    }
+
+    if (!user.government_issue_image && !user.certificate) {
+      return next(
+        new ErrorHandler(
+          "Both government issue image and certificate are required!",
+          400
+        )
+      );
+    }
+
+    let responseMessage;
+    switch (user.approved_document) {
+      case 0:
+        responseMessage = "Document is pending state!";
+        break;
+      case 1:
+        responseMessage = "Document approved by admin.";
+        break;
+      case 2:
+        responseMessage = "Document rejected by admin.";
+        break;
+      default:
+        responseMessage = "Invalid document status.";
+        break;
+    }
+
+    // Send a response with the user documents and the corresponding message
+    res.status(200).json({
+      success: true,
+      message: responseMessage,
+      status: user.approved_document,
+    });
+    
   } catch (error) {
     return next(new ErrorHandler(error.message, 500));
   }
@@ -157,51 +275,53 @@ export const forgotPassword = asyncErrors(async (req, res, next) => {
   const { email } = req.body;
 
   try {
+    // Find the user by email
     const user = await Users.findOne({ where: { email } });
-    console.log(user);
 
     if (!user) {
-      // return res.status(404).send("User not found");
       return next(new ErrorHandler("User not found!", 400));
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    req.session.otp = otp;
-    req.session.email = email;
-    req.session.otpExpires = Date.now() + 10 * 60 * 1000; // OTP expires in 10 minutes
+    const expiresAt = new Date(Date.now() + 1 * 60 * 1000); // OTP valid for 1 minute
 
-    // const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET_KEY, {
-    //   expiresIn: "30d",
-    // });
+    // Update the user's OTP and expiration time
+    await user.update({
+      otp, // store OTP in user table
+      expires_at: expiresAt, // store expiration time
+    });
 
-    var transporter = nodemailer.createTransport({
+
+    // Validate email configuration
+    if (!process.env.USER_EMAIL || !process.env.PASS) {
+      return next(new ErrorHandler("Email configuration is missing!", 500));
+    }
+
+    // Create transport for sending email
+    const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
         user: process.env.USER_EMAIL,
         pass: process.env.PASS,
       },
+      debug: true, // Enable debug output
+      logger: true,
     });
 
-    // var mailOptions = {
-    //   from: process.env.USER_EMAIL,
-    //   to: user.email,
-    //   subject: "Reset Password",
-    //   text: `${process.env.FRONTEND_URL}/api/v1/user/reset-password/${user.id}/${token}`,
-    // };
-
-    var mailOptions = {
+    // Prepare email options
+    const mailOptions = {
       from: process.env.USER_EMAIL,
       to: user.email,
       subject: "Password Reset OTP",
-      text: `Your password reset OTP is: ${otp}`,
+      text: `Your password reset OTP is: ${user.otp}`,
     };
 
+    // Send email
     transporter.sendMail(mailOptions, (error, info) => {
       if (error) {
         console.log("Error sending email:", error);
         return next(new ErrorHandler("Error sending email!", 400));
       } else {
-        console.log("Email sent:", info.response);
         return res.status(200).json({
           success: true,
           message: "Email sent with OTP",
@@ -209,34 +329,34 @@ export const forgotPassword = asyncErrors(async (req, res, next) => {
       }
     });
   } catch (error) {
-    console.error(
-      "Error processing password reset request for email:",
-      email,
-      error
-    );
-    res.status(500).send("Internal server error");
+    console.error("Error processing password reset request:", error);
+    return next(new ErrorHandler("Internal server error", 500));
   }
 });
 
 export const verifyOtp = asyncErrors(async (req, res, next) => {
   const { otp } = req.body;
-  if (!req.session.otp) {
-    return res.status(400).json({
-      success: false,
-      message: "Invalid or expired OTP",
+  try {
+    const otpRecord = await Users.findOne({
+      where: { otp }
     });
-  }
 
-  if (req.session.otp === otp && req.session.otpExpires > Date.now()) {
+    if (!otpRecord) {
+      return next(new ErrorHandler("Invalid or expired OTP!", 400));
+    }
+
+    // Check if the OTP has expired
+    if (otpRecord.expires_at < new Date()) {
+      return next(new ErrorHandler("OTP has expired!", 400));
+    }
+
     return res.status(200).json({
       success: true,
       message: "OTP verified successfully",
     });
-  } else {
-    return res.status(400).json({
-      success: false,
-      message: "Invalid or expired OTP",
-    });
+  } catch (error) {
+    console.error("Error verifying OTP:", error);
+    return next(new ErrorHandler("Internal server error", 500));
   }
 });
 
@@ -244,35 +364,53 @@ export const resendOtp = asyncErrors(async (req, res, next) => {
   const { email } = req.body;
 
   try {
+    // Find the user by email
     const user = await Users.findOne({ where: { email } });
+    console.log(user);
+
     if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
+      return next(new ErrorHandler("User not found!", 400));
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    req.session.otp = otp;
-    req.session.email = email;
-    req.session.otpExpires = Date.now() + 10 * 60 * 1000; // OTP expires in 10 minutes
+    const expiresAt = new Date(Date.now() + 1 * 60 * 1000); // OTP valid for 1 minute
 
-    var transporter = nodemailer.createTransport({
+    // Update the user's OTP and expiration time
+    await user.update({
+      otp, // store OTP in user table
+      expires_at: expiresAt, // store expiration time
+    });
+
+    console.log(user.otp, user.expires_at);
+
+    // Validate email configuration
+    if (!process.env.USER_EMAIL || !process.env.PASS) {
+      return next(new ErrorHandler("Email configuration is missing!", 500));
+    }
+
+    // Create transport for sending email
+    const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
         user: process.env.USER_EMAIL,
         pass: process.env.PASS,
       },
+      debug: true, // Enable debug output
+      logger: true,
     });
 
-    var mailOptions = {
+    // Prepare email options
+    const mailOptions = {
       from: process.env.USER_EMAIL,
       to: user.email,
       subject: "Password Reset OTP",
-      text: `Your password reset OTP is: ${otp}`,
+      text: `Your password reset OTP is: ${user.otp}`,
     };
 
+    // Send email
     transporter.sendMail(mailOptions, (error, info) => {
       if (error) {
+        console.log("Error sending email:", error);
         return next(new ErrorHandler("Error sending email!", 400));
       } else {
         return res.status(200).json({
@@ -282,31 +420,27 @@ export const resendOtp = asyncErrors(async (req, res, next) => {
       }
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: "Internal server error" });
+    console.error("Error processing password reset request:", error);
+    return next(new ErrorHandler("Internal server error", 500));
   }
 });
 
 export const resetPassword = asyncErrors(async (req, res, next) => {
-  const { userId, otp } = req.params;
-  const { password, confirmPassword } = req.body;
+  const { email, password, confirmPassword } = req.body;
 
   // Validate passwords
   if (password !== confirmPassword) {
     return next(new ErrorHandler("Passwords do not match!", 400));
   }
 
-  // Check if OTP was verified
-  if (
-    !req.session.otp ||
-    req.session.otp !== otp ||
-    req.session.otpExpires < Date.now()
-  ) {
-    return next(new ErrorHandler("Invalid or expired OTP.", 400));
+  if(!email || !password || !confirmPassword){
+    return next(new ErrorHandler("Please fill full details!", 400));
   }
+
 
   try {
     // Find the user by id
-    const user = await Users.findOne({ where: { id: userId } });
+    const user = await Users.findOne({ where: { email } });
 
     if (!user) {
       console.log("User not found");
@@ -321,7 +455,7 @@ export const resetPassword = asyncErrors(async (req, res, next) => {
 
     await user.save({ hooks: false });
 
-    const updatedUser = await Users.findOne({ where: { id: userId } });
+    const updatedUser = await Users.findOne({ where: { email } });
     // Verify if the hashed password matches the updated hashed password in DB
     if (hashedPassword === updatedUser.password) {
       console.log("Password has been correctly updated in the database.");
@@ -375,6 +509,7 @@ export const updateProfile = asyncErrors(async (req, res, next) => {
     longitude,
     password,
     confirmPassword,
+    about_me,
   } = req.body;
 
   // Ensure all required fields are provided
@@ -401,6 +536,7 @@ export const updateProfile = asyncErrors(async (req, res, next) => {
   if (courtName) user.courtName = courtName;
   if (latitude) user.latitude = latitude;
   if (longitude) user.longitude = longitude;
+  if (about_me) user.about_me = about_me;
 
   // Hash password if provided
   if (password) {
@@ -410,8 +546,12 @@ export const updateProfile = asyncErrors(async (req, res, next) => {
   }
 
   // File upload
-  const filePath = req.file ? req.file.path : user.profileAvatar; // Fallback to existing avatar if not provided
+  const filePath = req.file ? req.file.path.replace(/^public\//, '') : user.profileAvatar; 
   user.profileAvatar = filePath;
+
+  if(!user.profileAvatar){
+    return next(new ErrorHandler("Please provide profile avatar", 400));
+  }
 
   // Log before saving
   console.log("Before saving, User object: ", user);
@@ -442,6 +582,7 @@ export const updateProfile = asyncErrors(async (req, res, next) => {
     user: updatedUser,
   });
 });
+
 
 // Admin
 export const adminLogin = asyncErrors(async (req, res, next) => {
@@ -558,7 +699,7 @@ export const updateAdminProfile = asyncErrors(async (req, res, next) => {
   admin.phoneNumber = phoneNumber;
 
   //file upload
-  const filePath = req.file.path;
+  const filePath = req.file.path.replace(/^public\//, '');
   admin.profileAvatar = filePath;
 
   // Save the updated user
@@ -597,7 +738,89 @@ export const getAllUsers = asyncErrors(async (req, res, next) => {
   }
 });
 
-export const deleteUser = asyncErrors(async (req, res, next) => {
+export const getAllIndividual = asyncErrors(async (req, res, next) => {
+  try {
+    const Individual = await Users.findAll({
+      where: { userType: "individual" },
+    });
+
+    let totalIndividualUser = Individual.length;
+
+    if (Individual.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No coaches found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "totalIndividualUser retrieved successfully",
+      totalIndividualUser,
+      Individual,
+    });
+  } catch (error) {
+    console.error("Error retrieving IndividualUser:", error);
+    res.status(500).json({ message: "Internal Server Error", error });
+  }
+});
+
+export const getAllCoaches = asyncErrors(async (req, res, next) => {
+  try {
+    const coaches = await Users.findAll({
+      where: { userType: "Coach" },
+    });
+
+    let totalCoaches = coaches.length;
+
+    if (coaches.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No coaches found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Coaches retrieved successfully",
+      totalCoaches,
+      coaches,
+    });
+  } catch (error) {
+    console.error("Error retrieving coaches:", error);
+    res.status(500).json({ message: "Internal Server Error", error });
+  }
+});
+
+export const getSingleCoache = asyncErrors(async (req, res, next) => {
+  const { coachId } = req.params;
+
+  if (!coachId) {
+    return next(new ErrorHandler("coachId must be provided", 400));
+  }
+
+  try {
+    const coach = await Users.findOne({ where: { id: coachId, userType: "Coach" } });
+
+    if (!coach) {
+      return res.status(404).json({
+        success: false,
+        message: "Coach not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Coach retrieved successfully",
+      coach,
+    });
+  } catch (error) {
+    console.error("Error retrieving coach:", error);
+    res.status(500).json({ message: "Internal Server Error", error });
+  }
+});
+
+export const deleteUserIndividual = asyncErrors(async (req, res, next) => {
   const { userId } = req.params;
 
   if (!userId) {
@@ -605,17 +828,43 @@ export const deleteUser = asyncErrors(async (req, res, next) => {
   }
 
   try {
-    const user = await Users.findOne({ where: { id: userId } });
+    const user = await Users.findOne({ where: { id: userId, userType: "individual" } });
 
     if (!user) {
       return next(new ErrorHandler("User not found", 404));
     }
 
-    await Users.destroy({ where: { id: userId } });
+    await Users.destroy({ where: { id: userId, userType: "individual" } });
 
     res.status(200).json({
       success: true,
       message: "User deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting user:", error);
+    res.status(500).json({ message: "Internal Server Error", error });
+  }
+});
+
+export const deleteCoach = asyncErrors(async (req, res, next) => {
+  const { userId } = req.params;
+
+  if (!userId) {
+    return next(new ErrorHandler("User ID is required", 400));
+  }
+
+  try {
+    const user = await Users.findOne({ where: { id: userId, userType: "Coach" } });
+
+    if (!user) {
+      return next(new ErrorHandler("User not found", 404));
+    }
+
+    await Users.destroy({ where: { id: userId, userType: "Coach" } });
+
+    res.status(200).json({
+      success: true,
+      message: "Coach deleted successfully",
     });
   } catch (error) {
     console.error("Error deleting user:", error);
@@ -631,7 +880,7 @@ export const banUser = asyncErrors(async (req, res, next) => {
   }
 
   try {
-    const user = await Users.findOne({ where: { id: userId } });
+    const user = await Users.findOne({ where: { id: userId, userType: "individual" } });
 
     if (!user) {
       return next(new ErrorHandler("User not found", 404));
@@ -686,7 +935,7 @@ export const unbanUser = asyncErrors(async (req, res, next) => {
   }
 
   try {
-    const user = await Users.findOne({ where: { id: userId } });
+    const user = await Users.findOne({ where: { id: userId, userType: "individual" } });
 
     if (!user) {
       return next(new ErrorHandler("User not found", 404));
@@ -733,11 +982,121 @@ export const unbanUser = asyncErrors(async (req, res, next) => {
   }
 });
 
+export const banCoach = asyncErrors(async (req, res, next) => {
+  const { coachId } = req.params;
+
+  if (!coachId) {
+    return next(new ErrorHandler("coach ID is required", 400));
+  }
+
+  try {
+    const coach = await Users.findOne({ where: { id: coachId, userType: "Coach" } });
+
+    if (!coach) {
+      return next(new ErrorHandler("coach not found", 404));
+    }
+
+    coach.banned = true;
+    await coach.save();
+
+    // send Ban notification
+    const sendBanNotification = async (user) => {
+      const transporter = nodemailer.createTransport({
+        service: "Gmail",
+        auth: {
+          user: process.env.USER_EMAIL,
+          pass: process.env.PASS,
+        },
+      });
+
+      const mailOptions = {
+        from: process.env.USER_EMAIL,
+        to: user.email,
+        subject: "Account Banned",
+        text: `Hello ${user.userName},\n\nYour account has been banned due to violating our terms of service.\n\nRegards,\nTeam`,
+      };
+
+      try {
+        await transporter.sendMail(mailOptions);
+        console.log("Ban notification email sent");
+      } catch (error) {
+        console.error("Error sending ban notification email:", error);
+      }
+    };
+
+    await sendBanNotification(coach);
+
+    res.status(200).json({
+      success: true,
+      message: "coach banned successfully",
+      coach,
+    });
+  } catch (error) {
+    console.error("Error banning user:", error);
+    res.status(500).json({ message: "Internal Server Error", error });
+  }
+});
+
+export const unbanCoach = asyncErrors(async (req, res, next) => {
+  const { coachId } = req.params;
+
+  if (!coachId) {
+    return next(new ErrorHandler("coach ID is required", 400));
+  }
+
+  try {
+    const coach = await Users.findOne({ where: { id: coachId, userType: "Coach" } });
+
+    if (!coach) {
+      return next(new ErrorHandler("coach not found", 404));
+    }
+
+    coach.banned = false;
+    await coach.save();
+
+    // send UnBan account notification
+    const sendUnBanNotification = async (user) => {
+      const transporter = nodemailer.createTransport({
+        service: "Gmail",
+        auth: {
+          user: process.env.USER_EMAIL,
+          pass: process.env.PASS,
+        },
+      });
+
+      const mailOptions = {
+        from: process.env.USER_EMAIL,
+        to: user.email,
+        subject: "Account UnBan",
+        text: `Hello ${user.userName},\n\nYour account has UnBan.\n\nRegards,\nTeam`,
+      };
+
+      try {
+        await transporter.sendMail(mailOptions);
+        console.log("UnBan notification email sent");
+      } catch (error) {
+        console.error("Error sending unban notification email:", error);
+      }
+    };
+
+    await sendUnBanNotification(coach);
+
+    res.status(200).json({
+      success: true,
+      message: "coach unbanned successfully",
+      coach,
+    });
+  } catch (error) {
+    console.error("Error unbanning user:", error);
+    res.status(500).json({ message: "Internal Server Error", error });
+  }
+});
+
 export const getNotificationsAdmin = asyncErrors(async (req, res, next) => {
   try {
     const notifications = await Notifications.findAll({
       where: { isRead: false },
-      order: [['createdAt', 'DESC']],
+      order: [["createdAt", "DESC"]],
     });
 
     res.status(200).json({
@@ -746,11 +1105,10 @@ export const getNotificationsAdmin = asyncErrors(async (req, res, next) => {
       notifications,
     });
   } catch (error) {
-    // return next(new ErrorHandler(error.message, 500)); 
+    // return next(new ErrorHandler(error.message, 500));
     res.status(500).json({ message: "Internal Server Error", error });
   }
 });
-
 
 export const markNotificationAsRead = asyncErrors(async (req, res, next) => {
   try {
@@ -761,7 +1119,7 @@ export const markNotificationAsRead = asyncErrors(async (req, res, next) => {
     if (!notification) {
       return res.status(404).json({
         success: false,
-        message: 'Notification not found',
+        message: "Notification not found",
       });
     }
 
@@ -769,7 +1127,7 @@ export const markNotificationAsRead = asyncErrors(async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      message: 'Notification marked as read',
+      message: "Notification marked as read",
       notification,
     });
   } catch (error) {
@@ -777,4 +1135,102 @@ export const markNotificationAsRead = asyncErrors(async (req, res, next) => {
   }
 });
 
+export const approveOrRejectDocument = asyncErrors(async (req, res, next) => {
+  const { userId } = req.params;
+  const { status } = req.body; 
 
+  try {
+    const user = await Users.findOne({
+      where: { id: userId, userType: "Coach" },
+    });
+
+    if (!user) {
+      return next(new ErrorHandler("User not found or not a coach", 404));
+    }
+
+    if (!user.government_issue_image && !user.certificate) {
+      return next(
+        new ErrorHandler(
+          "Coach has not uploaded Documents!",
+          400
+        )
+      );
+    }
+
+    if (![1, 2].includes(status)) {
+      return next(new ErrorHandler("Invalid status value.", 400));
+    }
+
+    user.approved_document = status;
+    await user.save();
+
+      let notificationMessage;
+      if(notificationMessage = status === 1){
+        `Your document has been approved by the admin.`
+      }else if(notificationMessage = status === 2){
+        `Your document has been rejected by the admin.`
+      }else{
+        return next(new ErrorHandler("Invalid status value.", 400));  
+      }
+
+    // Notify the user of the document status update
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.USER_EMAIL,
+        pass: process.env.PASS,
+      },
+    });
+
+    const mailOptions = {
+      from: process.env.USER_EMAIL,
+      to: user.email,
+      subject: status === 1 ? "Document Approved" : status === 2 ? "Document Rejected" : "Not Valid Status",
+      text: `Dear ${user.userName},\n\n${notificationMessage}\n\nRegards,\nAdmin Team`,
+    };
+
+    // Send email notification to user
+    transporter.sendMail(mailOptions, (error, info) => {
+      if (error) {
+        console.log("Error sending email:", error);
+        return next(new ErrorHandler("Error sending email!", 400));
+      } else {
+        console.log("Email sent:", info.response);
+      }
+    });
+   
+    res.status(200).json({
+      success: true,
+      message: `Document ${status === 1 ? "approved" : status === 2 ? "rejected" : "not valid status"} successfully.`,
+      status,
+    });
+  } catch (error) {
+    return next(new ErrorHandler(error.message, 500));
+  }
+});
+
+export const statusCheckDocument = asyncErrors(async (req, res, next) => {
+  const { userId } = req.params;
+
+  try {
+    const user = await Users.findOne({
+      where: { id: userId, userType: "Coach" },
+    });
+
+    if (!user) {
+      return next(new ErrorHandler("User not found or not a coach", 404));
+    }
+
+
+    const status = user.approved_document;
+    await user.save();
+   
+    res.status(200).json({
+      success: true,
+      message: 'Document status checked successfully.',
+      status,
+    });
+  } catch (error) {
+    return next(new ErrorHandler(error.message, 500));
+  }
+});

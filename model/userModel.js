@@ -67,6 +67,7 @@ const Users = sequelize.define(
     },
     courtName: {
       type: DataTypes.STRING,
+      defaultValue: null,
       allowNull: true,
       unique: true,
     },
@@ -97,13 +98,36 @@ const Users = sequelize.define(
     profileAvatar: {
       type: DataTypes.STRING,
     },
+    about_me: {
+      type: DataTypes.STRING,
+    },
+    otp:{
+      type: DataTypes.STRING,
+    },
+    expires_at:{
+      type: DataTypes.DATE,
+    },
     government_issue_image:{
       type: DataTypes.STRING,
-      defaultValue: true,
     },
     certificate:{
       type: DataTypes.STRING,
-      defaultValue: true,
+    },
+    approved_document:{
+      type: DataTypes.INTEGER,
+      defaultValue: false,
+    },
+    facebook_link:{
+      type: DataTypes.STRING,
+    },
+    twitter_link:{
+      type: DataTypes.STRING,
+    },
+    instagram_link:{
+      type: DataTypes.STRING,
+    },
+    tiktok_link:{
+      type: DataTypes.STRING,
     },
     status_verify:{
       type: DataTypes.BOOLEAN,

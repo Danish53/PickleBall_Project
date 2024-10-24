@@ -19,6 +19,7 @@ export default (io) => {
       io.emit("userOffline", userPhoneNumber);
     });
 
+    // ========Group chat=========
     socket.on("joinGroup", async ({ groupId, userPhoneNumber }) => {
       try {
         const groupMember = await groupMembers.findOne({
@@ -27,13 +28,13 @@ export default (io) => {
 
         if (!groupMember) {
           socket.emit("error", "You are not a member of this group");
-          console.log("You are not a member of this group");
+          console.log(`Unauthorized attempt: ${userPhoneNumber} tried to join group ${groupId}`);
           return;
         }
 
         socket.join(groupId);
         console.log(
-          `User ${groupMember.userPhoneNumber} joined group ${groupId}`
+          `User ${userPhoneNumber} joined group ${groupId}`
         );
 
         const messages = await Message.findAll({
@@ -44,6 +45,7 @@ export default (io) => {
         socket.emit("loadMessages", messages);
       } catch (error) {
         console.error("Error loading messages:", error);
+        socket.emit("error", "Failed to join the group");
       }
     });
 
@@ -134,7 +136,7 @@ export default (io) => {
 
    
    
-    // private chat
+    // ========private chat=========
  
     // Event listener for 'startChat'
     socket.on(
@@ -148,6 +150,7 @@ export default (io) => {
 
           if (!receiver) {
             socket.emit("error", "Receiver not found");
+            console.log(`Receiver not found: ${receiverPhoneNumber}`);
             return;
           }
 
@@ -158,6 +161,7 @@ export default (io) => {
 
           if (!sender) {
             socket.emit("error", "Sender not found");
+            console.log(`Receiver not found: ${receiverPhoneNumber}`);
             return;
           }
 
@@ -181,6 +185,7 @@ export default (io) => {
               ],
             },
             order: [["createdAt", "ASC"]],
+            limit: 50,
           });
 
           // Send the chat history to the client
@@ -227,15 +232,21 @@ export default (io) => {
             .sort()
             .join("-");
 
-          // Emit the message to the private room
-          io.to(privateRoom).emit("privateMessage", newMessage);
+          // Emit the message to the private room recieve the message
+          io.to(privateRoom).emit("ReceivedPrivateMessage", newMessage);
 
           // Optionally, you can send a notification to the receiver
-          socket.broadcast.to(receiverPhoneNumber).emit("notification", {
+          // socket.broadcast.to(receiverPhoneNumber).emit("notification", {
+          //   type: "private",
+          //   senderPhoneNumber: sender.phoneNumber,
+          //   message: newMessage,
+          // });
+          socket.to(privateRoom).emit("notification", {
             type: "private",
             senderPhoneNumber: sender.phoneNumber,
             message: newMessage,
           });
+
         } catch (error) {
           console.error("Error sending private message:", error);
           socket.emit("error", "Failed to send message");
@@ -249,28 +260,35 @@ export default (io) => {
       async ({ messageId, senderPhoneNumber }) => {
         try {
           // Find the message by its ID
-          const message = await PrivateMessage.findByPk(messageId);
+          // const message = await PrivateMessage.findByPk(messageId);
+
+          const message = await PrivateMessage.findOne({
+            where: {
+              id: messageId,
+              senderPhoneNumber: senderPhoneNumber,
+            },
+          });
 
           if (!message) {
             socket.emit("error", "Message not found");
             return;
           }
 
-          // Find the sender by phone number
-          const sender = await Users.findOne({
-            where: { phoneNumber: senderPhoneNumber },
-          });
+          // // Find the sender by phone number
+          // const sender = await Users.findOne({
+          //   where: { phoneNumber: senderPhoneNumber },
+          // });
 
-          if (!sender) {
-            socket.emit("error", "Sender not found");
-            return;
-          }
+          // if (!sender) {
+          //   socket.emit("error", "Sender not found");
+          //   return;
+          // }
 
-          // Check if the sender is the one who sent the message
-          if (message.senderPhoneNumber !== sender.phoneNumber) {
-            socket.emit("error", "You can only delete your own messages");
-            return;
-          }
+          // // Check if the sender is the one who sent the message
+          // if (message.senderPhoneNumber !== sender.phoneNumber) {
+          //   socket.emit("error", "You can only delete your own messages");
+          //   return;
+          // }
 
           // Delete the message
           await message.destroy();
@@ -317,4 +335,19 @@ export default (io) => {
       console.log("User disconnected");
     });
   });
+
+  // admin notify
+  // io.on("connection", (socket) => {
+  //   console.log("Admin connected");
+  
+  //   socket.on("disconnect", () => {
+  //     console.log("Admin disconnected");
+  //   });
+  // });
+  
+  // return io;
+
 };
+
+
+

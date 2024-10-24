@@ -3,13 +3,12 @@ import multer from "multer";
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, "./public/temp"); //img folder path
+    cb(null, "./public/temp"); 
   },
   filename: function (req, file, cb) {
-    cb(null, file.originalname); //uploaded filename
+    cb(null, file.originalname);
   }
 });
 
-// Create multer instance with the storage configuration
 export const upload = multer({ storage });
 

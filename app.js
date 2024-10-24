@@ -17,7 +17,7 @@ import productroutes from "./router/marketPlaceRouter.js";
 
 const app = express();
 const a = dotenv.config({ path: "./.env" });
-console.log(a, "a");
+// console.log(a, "a");
 console.log("Database User:", process.env.MYSQL_USER);
 
 const server = http.createServer(app);
@@ -25,8 +25,8 @@ const io = new Server(server);
 
 app.use(
   cors({
-    origin: [process.env.FRONTEND_URL] || "*",
-    methods: ["GET", "PUT", "DELETE", "POST"],
+    origin: process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : "*",
+    methods: ["GET", "PUT", "DELETE", "POST", "PATCH"],
     credentials: true,
   })
 );
@@ -86,7 +86,7 @@ initSocket(io);
 io.use(isSocketAuthenticated);
 
 server.listen(process.env.PORT || 3000, () => {
-  console.log(`Server running on port ${process.env.PORT}`);
+  console.log(`Server running on port ${process.env.PORT}`); 
 });
  
 

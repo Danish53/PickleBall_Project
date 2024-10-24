@@ -1,6 +1,8 @@
 import express from "express";
 import {
+  documentUpload,
   forgotPassword,
+  getDocumentsVerify,
   getProfile,
   login,
   logout,
@@ -13,6 +15,8 @@ import {
 import { isAuthenticated } from "../middleware/auth.js";
 import { upload } from "../middleware/multerMiddleware.js";
 import {
+  createGroup,
+  getCourtDetails,
   pickleballCourts,
   searchCourts,
 } from "../controller/googleMapController.js";
@@ -28,18 +32,20 @@ import { checkBannedUser } from "../middleware/bannedUser.js";
 const router = express.Router();
 
 // user
-router.post("/register", upload.fields([
+router.post("/register", register);
+router.post("/document-upload/:userId", upload.fields([
   { name: 'government_issue_image', maxCount: 1 },
   { name: 'certificate', maxCount: 1 },
-]), register);
+]), documentUpload);
+router.get("/docuemnt-approved-check/:userId", getDocumentsVerify);
 router.post("/login", login);
 router.post("/forgot-password", forgotPassword);
 router.post("/verify-otp", verifyOtp);
 router.post("/resend-otp", resendOtp);
-router.post("/reset-password/:userId/:otp", resetPassword);
+router.post("/reset-password", resetPassword);
 router.get("/logout", isAuthenticated, logout);
 router.get("/getprofile", isAuthenticated, checkBannedUser, getProfile);
-router.put(
+router.post(
   "/profile/:id", 
   isAuthenticated, checkBannedUser, 
   upload.single("profileAvatar"),
@@ -47,7 +53,9 @@ router.put(
 );
 //court
 router.get("/pickleball-courts", isAuthenticated, checkBannedUser, pickleballCourts);
-router.get("/search-courts", isAuthenticated, checkBannedUser, searchCourts);
+router.get("/search-courts/:latitude/:longitude", isAuthenticated, checkBannedUser, searchCourts);
+router.get("/court-detail/:place_id", isAuthenticated, checkBannedUser, getCourtDetails);
+router.get("/create-group/:place_id/:userId", isAuthenticated, checkBannedUser, createGroup);
 //coaches
 router.get("/coaches/:groupId", isAuthenticated, checkBannedUser, getCoaches);
 router.post("/addSchedule/:coachId", isAuthenticated, checkBannedUser, addSchedule);

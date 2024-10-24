@@ -2,12 +2,20 @@ import express from "express";
 import {
   adminLogin,
   adminLogout,
+  approveOrRejectDocument,
+  banCoach,
   banUser,
-  deleteUser,
+  deleteCoach,
+  deleteUserIndividual,
   getAdminProfile,
+  getAllCoaches,
+  getAllIndividual,
   getAllUsers,
   getNotificationsAdmin,
+  getSingleCoache,
   markNotificationAsRead,
+  statusCheckDocument,
+  unbanCoach,
   unbanUser,
   updateAdminProfile,
   updateProfile,
@@ -23,6 +31,7 @@ import {
   addCategory,
   deleteCategory,
   listCategories,
+  updateCategory,
 } from "../controller/marketPlaceController.js";
 
 const routerAdmin = express.Router();
@@ -32,7 +41,7 @@ routerAdmin.post("/login", adminLogin);
 routerAdmin.get("/logout", isAdmin, adminLogout);
 routerAdmin.get("/profile", isAdmin, getAdminProfile);
 routerAdmin.put(
-  "/profile",
+  "/update-profile",
   isAdmin,
   upload.single("profileAvatar"),
   updateAdminProfile
@@ -49,15 +58,21 @@ routerAdmin.post("/group-create/:courtId", isAdmin, chatGroup);
 routerAdmin.get("/allgroups", isAdmin, allGroupsList);
 //all users
 routerAdmin.get("/getAllUsers", isAdmin, getAllUsers);
+routerAdmin.get("/getAllIndividualUser", isAdmin, getAllIndividual);
+routerAdmin.get("/getAllCoaches", isAdmin, getAllCoaches);
+routerAdmin.get("/getSingleCoach/:coachId", isAdmin, getSingleCoache);
 routerAdmin.put(
     "/profile/:id",
     isAdmin,
     upload.single("profileAvatar"),
     updateProfile
   );
-routerAdmin.delete("/deleteUser/:userId", isAdmin, deleteUser);
+routerAdmin.delete("/deleteUser-indivudual/:userId", isAdmin, deleteUserIndividual);
+routerAdmin.delete("/delete-coach/:userId", isAdmin, deleteCoach);
 routerAdmin.patch("/banUser/:userId", isAdmin, banUser);
 routerAdmin.patch("/unbanUser/:userId", isAdmin, unbanUser);
+routerAdmin.patch("/banCoach/:coachId", isAdmin, banCoach);
+routerAdmin.patch("/unbanCoach/:coachId", isAdmin, unbanCoach);
 //marketPlace
 routerAdmin.post("/addCategory", isAdmin, addCategory);
 routerAdmin.delete( 
@@ -65,9 +80,12 @@ routerAdmin.delete(
   isAdmin,
   deleteCategory
 );
+routerAdmin.put("/update-category/:id", isAdmin, updateCategory);
 routerAdmin.get("/listCategory", isAdmin, listCategories);
 routerAdmin.get("/allNotifications", isAdmin, getNotificationsAdmin);
 routerAdmin.post("/notifications/mark-as-read", isAdmin, markNotificationAsRead);
+routerAdmin.post("/document-approval/:userId", isAdmin, approveOrRejectDocument);
+routerAdmin.get("/status-check/:userId", isAdmin, statusCheckDocument);
 
 
 export default routerAdmin;

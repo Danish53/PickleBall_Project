@@ -3,8 +3,13 @@ import ErrorHandler from "../middleware/error.js";
 import { chatGroups } from "../model/chatGroupsModel.js";
 import { groupMembers } from "../model/groupMembers.js";
 import { Users } from "../model/userModel.js";
-import { generateGridPoints, getPickleballCourts } from "../utils/courts.js";
+import {
+  generateGridPoints,
+  getCourtDetailsById,
+  getPickleballCourts,
+} from "../utils/courts.js";
 
+// const apiKey = process.env.GOOGLE_MAP_API_KEY;
 //admin & user
 export const pickleballCourts = asyncErrors(async (req, res, next) => {
   const { page = 1, pageSize = 15 } = req.query;
@@ -15,49 +20,187 @@ export const pickleballCourts = asyncErrors(async (req, res, next) => {
   let allCourts = [];
 
   const fetchCourts = async (point) => {
-      const { courts } = await getPickleballCourts(point.latitude, point.longitude);
-      return courts;
+    const { courts } = await getPickleballCourts(
+      point.latitude,
+      point.longitude
+    );
+    return courts;
   };
 
-  const promises = gridPoints.map(point => fetchCourts(point));
+  const promises = gridPoints.map((point) => fetchCourts(point));
   const results = await Promise.all(promises);
 
-  results.forEach(courts => {
-      totalCourtsCount += courts.length;
-      allCourts = allCourts.concat(courts);
+  results.forEach((courts) => {
+    totalCourtsCount += courts.length;
+    allCourts = allCourts.concat(courts);
   });
 
   const paginatedCourts = allCourts.slice(startIndex, endIndex);
 
   res.status(200).json({
-      success: true,
-      message: "All Courts in USA fetched successfully.",
-      totalCourtsCount,
-      totalPages: Math.ceil(totalCourtsCount / pageSize),
-      currentPage: parseInt(page, 15),
-      courts: paginatedCourts,
+    success: true,
+    message: "All Courts in USA fetched successfully.",
+    totalCourtsCount,
+    totalPages: Math.ceil(totalCourtsCount / pageSize),
+    currentPage: parseInt(page, 15),
+    courts: paginatedCourts,
   });
 });
 
 //user
 export const searchCourts = asyncErrors(async (req, res, next) => {
-  const { latitude, longitude } = req.query;
+  const { latitude, longitude } = req.params;
 
   if (!latitude || !longitude) {
     return next(new ErrorHandler("Latitude and longitude are required", 400));
   }
 
-  // Fetch pickleball courts for the given location
-  const courts = await getPickleballCourts(latitude, longitude);
+  const radius = 10000;
+  const courts = await getPickleballCourts(latitude, longitude, radius);
 
-  // res.json({ totalCourts: courts.length, courts });
+  const totalCourts = courts.length;
+
+  if (totalCourts === 0) {
+    return res.status(404).json({
+      success: false,
+      message: "No courts found for the given location",
+    });
+  }
+
+  const courtData = courts.map((court) => ({
+    id: court.place_id,
+    name: court.name,
+  }));
+
   res.status(200).json({
     success: true,
-    message: "Search successfully",
-    totalCourts: courts.length,
-    courts,
+    message: "Courts fetched successfully",
+    totalCourts,
+    courts: courtData,
   });
 });
+
+
+export const getCourtDetails = asyncErrors(async (req, res, next) => {
+  const { place_id } = req.params;
+
+  if (!place_id) {
+    return next(new ErrorHandler("Court ID is required", 400));
+  }
+
+  const court = await getCourtDetailsById(place_id);
+
+  if (!court) {
+    return next(new ErrorHandler("Court not found", 404));
+  }
+
+  if (!court.place_id) {
+    return next(new ErrorHandler("Court ID not found", 404));
+  }
+
+  res.status(200).json({
+    success: true,
+    message: "Court details fetched successfully",
+    court,
+  });
+});
+
+// create group
+export const createGroup = asyncErrors(async (req, res, next) => {
+  const { place_id, userId } = req.params;
+
+  if (!place_id || !userId) {
+    return next(new ErrorHandler("Court ID and User ID must be provided", 400));
+  }
+
+  try {
+    // Fetch court details
+    const court = await getCourtDetailsById(place_id);
+
+    // Validate if the court exists
+    if (!court) {
+      return next(new ErrorHandler("Court not found for the provided ID", 404));
+    }
+
+    // Check if the user exists
+    const user = await Users.findOne({ where: { id: userId } });
+    if (!user) {
+      return next(new ErrorHandler("User not found", 400));
+    }
+
+    // Check if a group already exists for this court
+    let group = await chatGroups.findOne({ where: { courtId: court.place_id } });
+
+    // If group exists, check if the user is already in the group
+    if (group) {
+      const isUserAlreadyInGroup = await groupMembers.findOne({ where: { userId: user.id, groupId: group.id } });
+
+      // If user is already in the group, return success
+      if (isUserAlreadyInGroup) {
+        return res.status(200).json({
+          success: true,
+          message: "User is already part of the group",
+          group,
+        });
+      }
+
+      // If user is not in the group, add the user
+      await groupMembers.create({
+        groupId: group.id,
+        userId: user.id,
+        userPhoneNumber: user.phoneNumber,
+        userName: user.name,
+        userType: user.userType,
+        profileAvatar: user.profileAvatar,
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: "User successfully joined the group",
+        group,
+      });
+    }
+
+    // If no group exists, create a new group
+    const admin = await Users.findOne({ where: { isAdmin: true } });
+    if (!admin) {
+      return next(new ErrorHandler("No admin user found", 400));
+    }
+
+    group = await chatGroups.create({
+      courtId: court.place_id,
+      courtName: court.name,
+      groupName: court.name,
+      latitude: court.geometry.location.lat,
+      longitude: court.geometry.location.lng,
+      adminId: admin.id,
+    });
+
+    // Add the user to the newly created group
+    await groupMembers.create({
+      groupId: group.id,
+      userId: user.id,
+      userPhoneNumber: user.phoneNumber,
+      userName: user.name,
+      userType: user.userType,
+      profileAvatar: user.profileAvatar,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Group created and user successfully added",
+      group,
+    });
+  } catch (error) {
+    console.error("Error creating or joining group:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
+  }
+});
+
+
 
 //admin
 export const chatGroup = asyncErrors(async (req, res, next) => {
@@ -74,14 +217,14 @@ export const chatGroup = asyncErrors(async (req, res, next) => {
 
   try {
     const courts = await getPickleballCourts();
-    console.log(courts)
+    console.log(courts);
 
     if (!Array.isArray(courts)) {
       return next(new ErrorHandler("Failed to retrieve courts data", 500));
     }
 
     let court = courts.find((court) => String(court.courtId) === courtId);
-    if (!court) { 
+    if (!court) {
       return next(
         new ErrorHandler(
           "Invalid Court ID or no courts found for the provided ID",

@@ -26,6 +26,36 @@ export const addCategory = asyncErrors(async (req, res, next) => {
   }
 });
 
+export const updateCategory = asyncErrors(async (req, res, next) => {
+  const { id } = req.params;
+  const { categoryName } = req.body;
+
+  if (!categoryName) {
+    return next(new ErrorHandler("Category name must be provided", 400));
+  }
+
+  try {
+    const category = await Category.findOne({ where: { id } });
+
+  if (!category) {
+    return next(new ErrorHandler("category not found", 404));
+  }
+
+  category.categoryName = categoryName;
+
+  await category.save();
+
+    res.status(201).json({
+      success: true,
+      message: "Category updated successfully",
+      category,
+    });
+  } catch (error) {
+    console.error("Error adding category:", error);
+    res.status(500).json({ message: "Internal Server Error", error });
+  }
+});
+
 //user & admin
 export const listCategories = asyncErrors(async (req, res, next) => {
   try {
@@ -106,7 +136,7 @@ export const uploadProducts = asyncErrors(async (req, res, next) => {
   }
 
   // File upload
-  const imageUrl = req.file ? req.file.path : null;
+  const imageUrl = req.file ? req.file.path.replace(/^public\//, '') : null;
 
   if (!imageUrl) {
     return next(new ErrorHandler("Image uploading error!", 400));
@@ -134,6 +164,8 @@ export const uploadProducts = asyncErrors(async (req, res, next) => {
       imageUrl,
       categoryId,
     });
+
+
 
     res.status(200).json({
       success: true,
