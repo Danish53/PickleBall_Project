@@ -5,6 +5,9 @@ import {
   allProducts,
   listCategories,
   searchProductsByCategory,
+  singleProductDetails,
+  singleUserProducts,
+  updateProduct,
   uploadProducts,
 } from "../controller/marketPlaceController.js";
 import { checkBannedUser } from "../middleware/bannedUser.js";
@@ -19,6 +22,13 @@ productroutes.post(
   upload.single("imageUrl"),
   uploadProducts
 );
+productroutes.post(
+  "/productupdate/:userId/:productId",
+  isAuthenticated,
+  checkBannedUser,
+  upload.single("imageUrl"),
+  updateProduct
+);
 productroutes.get("/listCategory", isAuthenticated, checkBannedUser, listCategories);
 productroutes.get(
   "/searchProductsByCategory/:categoryId",
@@ -27,5 +37,7 @@ productroutes.get(
   searchProductsByCategory
 );
 productroutes.get("/allProducts", isAuthenticated, checkBannedUser, allProducts);
+productroutes.get("/single-user-products/:userId", isAuthenticated, checkBannedUser, singleUserProducts);
+productroutes.get("/single-product/:productId", isAuthenticated, checkBannedUser, singleProductDetails);
 
 export default productroutes;

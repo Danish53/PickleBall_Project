@@ -7,6 +7,10 @@ import bcrypt from "bcrypt";
 import { Op } from "sequelize";
 import nodemailer from "nodemailer";
 import { Notifications } from "../model/NotificationAdmin.js";
+import { groupMembers } from "../model/groupMembers.js";
+import { PrivateMessage } from "../model/privateMessage.js";
+import { sequelize } from "../database/dbConnection.js";
+// import { Message } from "../model/messageModel.js";
 // import { sendResetEmail } from "../utils/sendMailer.js";
 
 // User
@@ -228,7 +232,6 @@ export const getDocumentsVerify = asyncErrors(async (req, res, next) => {
       message: responseMessage,
       status: user.approved_document,
     });
-    
   } catch (error) {
     return next(new ErrorHandler(error.message, 500));
   }
@@ -291,7 +294,6 @@ export const forgotPassword = asyncErrors(async (req, res, next) => {
       expires_at: expiresAt, // store expiration time
     });
 
-
     // Validate email configuration
     if (!process.env.USER_EMAIL || !process.env.PASS) {
       return next(new ErrorHandler("Email configuration is missing!", 500));
@@ -338,7 +340,7 @@ export const verifyOtp = asyncErrors(async (req, res, next) => {
   const { otp } = req.body;
   try {
     const otpRecord = await Users.findOne({
-      where: { otp }
+      where: { otp },
     });
 
     if (!otpRecord) {
@@ -433,10 +435,9 @@ export const resetPassword = asyncErrors(async (req, res, next) => {
     return next(new ErrorHandler("Passwords do not match!", 400));
   }
 
-  if(!email || !password || !confirmPassword){
+  if (!email || !password || !confirmPassword) {
     return next(new ErrorHandler("Please fill full details!", 400));
   }
-
 
   try {
     // Find the user by id
@@ -546,10 +547,12 @@ export const updateProfile = asyncErrors(async (req, res, next) => {
   }
 
   // File upload
-  const filePath = req.file ? req.file.path.replace(/^public\//, '') : user.profileAvatar; 
+  const filePath = req.file
+    ? req.file.path.replace(/^public\//, "")
+    : user.profileAvatar;
   user.profileAvatar = filePath;
 
-  if(!user.profileAvatar){
+  if (!user.profileAvatar) {
     return next(new ErrorHandler("Please provide profile avatar", 400));
   }
 
@@ -583,6 +586,122 @@ export const updateProfile = asyncErrors(async (req, res, next) => {
   });
 });
 
+// single user send message list
+
+export const listUsersWhoSentMessages = asyncErrors(async (req, res, next) => {
+  const { receiverPhoneNumber } = req.params;
+
+  if (!receiverPhoneNumber) {
+    return next(
+      new ErrorHandler("receiverPhoneNumber parameter is missing!", 400)
+    );
+  }
+
+  // Find user by receiver's phone number
+  const user = await Users.findOne({
+    where: { phoneNumber: receiverPhoneNumber },
+  });
+  if (!user) {
+    return next(new ErrorHandler("User not found", 404));
+  }
+
+  // Fetch distinct sender phone numbers with their latest message time
+  const latestMessages = await PrivateMessage.findAll({
+    attributes: [
+      "senderPhoneNumber",
+      [sequelize.fn("MAX", sequelize.col("createdAt")), "latestMessageTime"],
+    ],
+    where: { receiverPhoneNumber: user.phoneNumber },
+    group: ["senderPhoneNumber"],
+    raw: true,
+  });
+
+  // Map sender numbers to retrieve user details, latest message, and unread count
+  const usersWithLatestMessages = await Promise.all(
+    latestMessages.map(async ({ senderPhoneNumber }) => {
+      // Fetch sender user details
+      const senderUser = await Users.findOne({
+        where: { phoneNumber: senderPhoneNumber },
+        attributes: ["phoneNumber", "userName", "profileAvatar", "userType"],
+        raw: true,
+      });
+
+      // Fetch latest message content for each sender-receiver pair
+      const latestMessage = await PrivateMessage.findOne({
+        where: {
+          senderPhoneNumber,
+          receiverPhoneNumber: user.phoneNumber,
+        },
+        order: [["createdAt", "DESC"]],
+        attributes: ["message", "createdAt"],
+        raw: true,
+      });
+
+      // Count unread messages from this sender
+      const unreadCount = await PrivateMessage.count({
+        where: {
+          senderPhoneNumber,
+          receiverPhoneNumber: user.phoneNumber,
+          messageStatus: 0, // Only count unread messages
+        },
+      });
+
+      return {
+        ...senderUser,
+        latestMessage: latestMessage?.message || null,
+        latestMessageTime: latestMessage?.createdAt || null,
+        unreadMessageCount: unreadCount.toString(),
+      };
+    })
+  );
+
+  res.status(200).json({
+    success: true,
+    message: "List of users who sent messages retrieved successfully",
+    users: usersWithLatestMessages,
+  });
+});
+
+// value read or not
+export const messageStatusReadOrNot = asyncErrors(async (req, res, next) => {
+  const { receiverPhoneNumber, messageStatus } = req.params;
+
+  if (!receiverPhoneNumber || !messageStatus) {
+    return next(
+      new ErrorHandler(
+        "receiverPhoneNumber or messageStatus parameter is missing!",
+        400
+      )
+    );
+  }
+
+  const user = await Users.findOne({
+    where: { phoneNumber: receiverPhoneNumber },
+  });
+  if (!user) {
+    return next(new ErrorHandler("User not found", 404));
+  }
+
+  const [updatedRowsCount] = await PrivateMessage.update(
+    { messageStatus: 1 },
+    {
+      where: {
+        receiverPhoneNumber,
+        messageStatus: 0,
+      },
+    }
+  );
+
+  if (updatedRowsCount === 0) {
+    return next(new ErrorHandler("No unread messages found!", 404));
+  }
+
+  res.status(200).json({
+    success: true,
+    message: "Notification status updated successfully",
+    updatedCount: updatedRowsCount,
+  });
+});
 
 // Admin
 export const adminLogin = asyncErrors(async (req, res, next) => {
@@ -699,7 +818,7 @@ export const updateAdminProfile = asyncErrors(async (req, res, next) => {
   admin.phoneNumber = phoneNumber;
 
   //file upload
-  const filePath = req.file.path.replace(/^public\//, '');
+  const filePath = req.file.path.replace(/^public\//, "");
   admin.profileAvatar = filePath;
 
   // Save the updated user
@@ -800,7 +919,9 @@ export const getSingleCoache = asyncErrors(async (req, res, next) => {
   }
 
   try {
-    const coach = await Users.findOne({ where: { id: coachId, userType: "Coach" } });
+    const coach = await Users.findOne({
+      where: { id: coachId, userType: "Coach" },
+    });
 
     if (!coach) {
       return res.status(404).json({
@@ -828,7 +949,9 @@ export const deleteUserIndividual = asyncErrors(async (req, res, next) => {
   }
 
   try {
-    const user = await Users.findOne({ where: { id: userId, userType: "individual" } });
+    const user = await Users.findOne({
+      where: { id: userId, userType: "individual" },
+    });
 
     if (!user) {
       return next(new ErrorHandler("User not found", 404));
@@ -854,7 +977,9 @@ export const deleteCoach = asyncErrors(async (req, res, next) => {
   }
 
   try {
-    const user = await Users.findOne({ where: { id: userId, userType: "Coach" } });
+    const user = await Users.findOne({
+      where: { id: userId, userType: "Coach" },
+    });
 
     if (!user) {
       return next(new ErrorHandler("User not found", 404));
@@ -880,7 +1005,9 @@ export const banUser = asyncErrors(async (req, res, next) => {
   }
 
   try {
-    const user = await Users.findOne({ where: { id: userId, userType: "individual" } });
+    const user = await Users.findOne({
+      where: { id: userId, userType: "individual" },
+    });
 
     if (!user) {
       return next(new ErrorHandler("User not found", 404));
@@ -935,7 +1062,9 @@ export const unbanUser = asyncErrors(async (req, res, next) => {
   }
 
   try {
-    const user = await Users.findOne({ where: { id: userId, userType: "individual" } });
+    const user = await Users.findOne({
+      where: { id: userId, userType: "individual" },
+    });
 
     if (!user) {
       return next(new ErrorHandler("User not found", 404));
@@ -990,7 +1119,9 @@ export const banCoach = asyncErrors(async (req, res, next) => {
   }
 
   try {
-    const coach = await Users.findOne({ where: { id: coachId, userType: "Coach" } });
+    const coach = await Users.findOne({
+      where: { id: coachId, userType: "Coach" },
+    });
 
     if (!coach) {
       return next(new ErrorHandler("coach not found", 404));
@@ -1045,7 +1176,9 @@ export const unbanCoach = asyncErrors(async (req, res, next) => {
   }
 
   try {
-    const coach = await Users.findOne({ where: { id: coachId, userType: "Coach" } });
+    const coach = await Users.findOne({
+      where: { id: coachId, userType: "Coach" },
+    });
 
     if (!coach) {
       return next(new ErrorHandler("coach not found", 404));
@@ -1137,7 +1270,7 @@ export const markNotificationAsRead = asyncErrors(async (req, res, next) => {
 
 export const approveOrRejectDocument = asyncErrors(async (req, res, next) => {
   const { userId } = req.params;
-  const { status } = req.body; 
+  const { status } = req.body;
 
   try {
     const user = await Users.findOne({
@@ -1149,12 +1282,7 @@ export const approveOrRejectDocument = asyncErrors(async (req, res, next) => {
     }
 
     if (!user.government_issue_image && !user.certificate) {
-      return next(
-        new ErrorHandler(
-          "Coach has not uploaded Documents!",
-          400
-        )
-      );
+      return next(new ErrorHandler("Coach has not uploaded Documents!", 400));
     }
 
     if (![1, 2].includes(status)) {
@@ -1164,14 +1292,14 @@ export const approveOrRejectDocument = asyncErrors(async (req, res, next) => {
     user.approved_document = status;
     await user.save();
 
-      let notificationMessage;
-      if(notificationMessage = status === 1){
-        `Your document has been approved by the admin.`
-      }else if(notificationMessage = status === 2){
-        `Your document has been rejected by the admin.`
-      }else{
-        return next(new ErrorHandler("Invalid status value.", 400));  
-      }
+    let notificationMessage;
+    if ((notificationMessage = status === 1)) {
+      `Your document has been approved by the admin.`;
+    } else if ((notificationMessage = status === 2)) {
+      `Your document has been rejected by the admin.`;
+    } else {
+      return next(new ErrorHandler("Invalid status value.", 400));
+    }
 
     // Notify the user of the document status update
     const transporter = nodemailer.createTransport({
@@ -1185,7 +1313,12 @@ export const approveOrRejectDocument = asyncErrors(async (req, res, next) => {
     const mailOptions = {
       from: process.env.USER_EMAIL,
       to: user.email,
-      subject: status === 1 ? "Document Approved" : status === 2 ? "Document Rejected" : "Not Valid Status",
+      subject:
+        status === 1
+          ? "Document Approved"
+          : status === 2
+          ? "Document Rejected"
+          : "Not Valid Status",
       text: `Dear ${user.userName},\n\n${notificationMessage}\n\nRegards,\nAdmin Team`,
     };
 
@@ -1198,10 +1331,16 @@ export const approveOrRejectDocument = asyncErrors(async (req, res, next) => {
         console.log("Email sent:", info.response);
       }
     });
-   
+
     res.status(200).json({
       success: true,
-      message: `Document ${status === 1 ? "approved" : status === 2 ? "rejected" : "not valid status"} successfully.`,
+      message: `Document ${
+        status === 1
+          ? "approved"
+          : status === 2
+          ? "rejected"
+          : "not valid status"
+      } successfully.`,
       status,
     });
   } catch (error) {
@@ -1221,16 +1360,71 @@ export const statusCheckDocument = asyncErrors(async (req, res, next) => {
       return next(new ErrorHandler("User not found or not a coach", 404));
     }
 
-
     const status = user.approved_document;
     await user.save();
-   
+
     res.status(200).json({
       success: true,
-      message: 'Document status checked successfully.',
+      message: "Document status checked successfully.",
       status,
     });
   } catch (error) {
     return next(new ErrorHandler(error.message, 500));
   }
 });
+
+export const groupListSingleUser = asyncErrors(async (req, res, next) => {
+  const { userId } = req.params;
+
+  if (!userId) {
+    return next(new ErrorHandler("userId in parameter missing!", 400));
+  }
+
+  try {
+    const user = await Users.findOne({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      return next(new ErrorHandler("User Not Found!", 404));
+    }
+
+    const groups = await groupMembers.findAll({
+      where: { userId },
+    });
+
+    if (!groups || groups.length === 0) {
+      return next(new ErrorHandler("No Groups Found!", 404));
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Groups retrieved successfully",
+      groups,
+    });
+  } catch (error) {
+    return next(new ErrorHandler(error.message, 500));
+  }
+});
+
+// export const getPrivateMessages = asyncErrors(async (req, res, next) => {
+//   const { userPhoneNumber } = req.params;
+//   try {
+//     const messages = await Message.findAll({
+//       where: { userPhoneNumber },
+//     });
+
+//     if (!messages || messages.length === 0) {
+//       return next(new ErrorHandler("No messages found!", 404));
+//     }
+
+//     res.status(200).json({
+//       success: true,
+//       message: "Private messages retrieved successfully",
+//       messages,
+//     });
+//   } catch (error) {
+//     console.error("Error fetching private messages:", error);
+//     res.status(500).json({ success: false, message: "Internal Server Error" });
+//   }
+// });

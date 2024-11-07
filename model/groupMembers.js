@@ -16,6 +16,15 @@ const groupMembers = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: false,
     },
+    groupName: {
+      type: DataTypes.STRING,
+    },
+    latitude: {
+      type: DataTypes.STRING,
+    },
+    longitude: {
+      type: DataTypes.STRING,
+    },
     userPhoneNumber: {
       type: DataTypes.INTEGER,
     },

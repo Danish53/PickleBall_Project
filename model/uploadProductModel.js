@@ -12,6 +12,9 @@ const uploadProduct = sequelize.define(
     userId: {
       type: DataTypes.INTEGER,
     },
+    phoneNumber: {
+      type: DataTypes.STRING,
+    },
     productName: {
       type: DataTypes.STRING,
       allowNull: true,
@@ -39,6 +42,10 @@ const uploadProduct = sequelize.define(
         model: "Categories",
         key: "id",
       },
+    },
+    sellerRating: {
+      type: DataTypes.STRING,
+      allowNull: true,
     },
   },
   {

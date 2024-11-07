@@ -4,6 +4,7 @@ import { Users } from "../model/userModel.js";
 import { chatGroups } from "../model/chatGroupsModel.js";
 import ErrorHandler from "../middleware/error.js";
 import { groupMembers } from "../model/groupMembers.js";
+import { PrivateMessage } from "../model/privateMessage.js";
 
 //user
 export const joinGroup = asyncErrors(async (req, res, next) => {
@@ -87,3 +88,5 @@ export const joinGroup = asyncErrors(async (req, res, next) => {
 
 //   res.status(200).json({ success: true, message: newMessage });
 // });
+
+

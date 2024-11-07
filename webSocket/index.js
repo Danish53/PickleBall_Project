@@ -8,7 +8,6 @@ import { Users } from "../model/userModel.js";
 export default (io) => {
   io.on("connection", (socket) => {
     console.log("A user connected");
-    // console.log(socket, "socket");
 
     socket.on("userConnect", (userPhoneNumber) => {
       io.emit("userOnline", userPhoneNumber);
@@ -20,6 +19,8 @@ export default (io) => {
     });
 
     // ========Group chat=========
+
+    // Join a group
     socket.on("joinGroup", async ({ groupId, userPhoneNumber }) => {
       try {
         const groupMember = await groupMembers.findOne({
@@ -37,10 +38,9 @@ export default (io) => {
           `User ${userPhoneNumber} joined group ${groupId}`
         );
 
-        const messages = await Message.findAll({
+        const messages = await Message.findAll({ 
           where: { groupId },
           order: [["createdAt", "ASC"]],
-          limit: 100,
         });
         socket.emit("loadMessages", messages);
       } catch (error) {
@@ -49,43 +49,46 @@ export default (io) => {
       }
     });
 
-    // Event listener for 'sendMessage'
     socket.on("sendMessage", async ({ groupId, userPhoneNumber, message }) => {
       try {
-        const groupMemberss = await groupMembers.findAll({
-          where: { groupId },
-        });
-        console.log("Fetched group members:", groupMemberss);
 
+        const groupMemberss = await groupMembers.findAll({ where: { groupId, userPhoneNumber } });
+        console.log("Fetched group members:", groupMemberss); 
+    
         if (Array.isArray(groupMemberss)) {
           const newMessage = await Message.create({
             groupId,
             userPhoneNumber,
             message,
           });
+
+    
           io.to(groupId).emit("message", newMessage);
 
-          // Send notification to group members
-          groupMemberss.forEach((member) => {
-            if (member.userPhoneNumber !== userPhoneNumber) {
-              socket.broadcast
-                .to(member.userPhoneNumber.toString())
-                .emit("notification", {
-                  type: "group",
-                  groupId,
-                  message: newMessage,
-                });
-            }
-          });
+          
+          console.log("newMessage", newMessage);
+    
+          // groupMemberss.forEach((member) => {
+          //   if (member.userPhoneNumber !== userPhoneNumber) {
+          //     // Broadcasting notification to each member in their own room
+          //     console.log(`Sending notification to user: ${member.userPhoneNumber}`);
+          //     socket.broadcast
+          //       .to(member.userPhoneNumber.toString())
+          //       .emit("notification", {
+          //         type: "group",
+          //         groupId,
+          //         message: newMessage,
+          //       });
+          //   }
+          // });
         } else {
-          console.error("groupMemberss is not an array:", groupMemberss);
+          console.error("No group members found or result is not an array:", groupMemberss);
         }
       } catch (error) {
-        console.error("Error sending message:", error);
+        console.error("Error sending message:", error.stack);
       }
     });
-
-    // Event listener for 'deleteMessage'
+    
     socket.on(
       "deleteMessage",
       async ({ messageId, groupId, userPhoneNumber }) => {
@@ -134,8 +137,6 @@ export default (io) => {
       }
     );
 
-   
-   
     // ========private chat=========
  
     // Event listener for 'startChat'
@@ -185,7 +186,6 @@ export default (io) => {
               ],
             },
             order: [["createdAt", "ASC"]],
-            limit: 50,
           });
 
           // Send the chat history to the client
@@ -227,6 +227,7 @@ export default (io) => {
             message,
           });
 
+
           // Create a unique room based on phone numbers
           const privateRoom = [sender.phoneNumber, receiver.phoneNumber]
             .sort()
@@ -248,11 +249,11 @@ export default (io) => {
           });
 
         } catch (error) {
-          console.error("Error sending private message:", error);
+          console.log("Error sending private message:", error);
           socket.emit("error", "Failed to send message");
         }
       }
-    );
+    ); 
 
     // Event listener for 'deletePrivateMessage'
     socket.on(
@@ -310,6 +311,7 @@ export default (io) => {
       }
     );
 
+
     socket.on("userTyping", ({ senderPhoneNumber, receiverPhoneNumber }) => {
       const privateRoom = [senderPhoneNumber, receiverPhoneNumber]
         .sort()
@@ -335,17 +337,6 @@ export default (io) => {
       console.log("User disconnected");
     });
   });
-
-  // admin notify
-  // io.on("connection", (socket) => {
-  //   console.log("Admin connected");
-  
-  //   socket.on("disconnect", () => {
-  //     console.log("Admin disconnected");
-  //   });
-  // });
-  
-  // return io;
 
 };
 

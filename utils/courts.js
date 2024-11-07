@@ -16,8 +16,8 @@ export const generateGridPoints = (step = 1.0) => {
     }
   }
   return points;
-};
-
+};    
+ 
 
 export const getPickleballCourts = async (latitude, longitude, radius) => {
   let courts = [];

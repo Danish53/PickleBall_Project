@@ -4,8 +4,10 @@ import {
   forgotPassword,
   getDocumentsVerify,
   getProfile,
+  listUsersWhoSentMessages,
   login,
   logout,
+  messageStatusReadOrNot,
   register,
   resendOtp,
   resetPassword,
@@ -28,6 +30,7 @@ import {
   getCoachServices,
 } from "../controller/CoatchesController.js";
 import { checkBannedUser } from "../middleware/bannedUser.js"; 
+import { addSellerRating } from "../controller/sellerRatingController.js";
 
 const router = express.Router();
 
@@ -62,5 +65,13 @@ router.post("/addSchedule/:coachId", isAuthenticated, checkBannedUser, addSchedu
 router.get("/getAllSchedules/:coachId", isAuthenticated, checkBannedUser, getCoachSchedules);
 router.post("/addCoachServices/:coachId", isAuthenticated, checkBannedUser, addCoachServices);
 router.get("/getCoachServices/:coachId", isAuthenticated, checkBannedUser, getCoachServices);
+router.get("/get-chats/:receiverPhoneNumber", isAuthenticated, checkBannedUser, listUsersWhoSentMessages);
+router.post("/message-status/:receiverPhoneNumber/:messageStatus", isAuthenticated, checkBannedUser, messageStatusReadOrNot);
+
+// sellers ratings
+router.post("/rating/:sellerId", isAuthenticated, checkBannedUser, addSellerRating); 
+
+
+// router.get("/messages/:userPhoneNumber", getPrivateMessages);
 
 export default router;

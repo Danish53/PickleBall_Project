@@ -1,8 +1,8 @@
 import { DataTypes } from "sequelize";
 import { sequelize } from "../database/dbConnection.js";
 
-const Message = sequelize.define(
-  "messages",
+const SellerRating = sequelize.define(
+  "sellerRating",
   {
     id: {
       type: DataTypes.INTEGER,
@@ -12,16 +12,16 @@ const Message = sequelize.define(
     userId: {
       type: DataTypes.INTEGER,
     },
-    userPhoneNumber: {
-      type: DataTypes.STRING,
-    },
-    groupId: {
+    sellerId: {
       type: DataTypes.INTEGER,
-      allowNull: false,
+      
     },
-    message: {
-      type: DataTypes.TEXT,
-      allowNull: false,
+    rating: {
+      type: DataTypes.STRING,
+      validate: {
+        min: 1.0,
+        max: 5.0,
+      },
     },
   },
   {
@@ -29,4 +29,4 @@ const Message = sequelize.define(
   }
 );
 
-export { Message };
+export { SellerRating };

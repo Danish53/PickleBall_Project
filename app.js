@@ -12,7 +12,7 @@ import compression from "compression";
 import http from "http";
 import { Server } from "socket.io";
 import initSocket from "./webSocket/index.js";
-import { isSocketAuthenticated } from "./middleware/socketAuthentication.js";
+// import { isSocketAuthenticated } from "./middleware/socketAuthentication.js";
 import productroutes from "./router/marketPlaceRouter.js";
 
 const app = express();
@@ -21,7 +21,13 @@ const a = dotenv.config({ path: "./.env" });
 console.log("Database User:", process.env.MYSQL_USER);
 
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  cors: {
+    origin:  process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : "*",
+    methods: ["GET", "POST"], 
+    credentials: true, 
+  },
+});
 
 app.use(
   cors({
@@ -83,7 +89,7 @@ app.use(errorMiddleware);
 
 initSocket(io);
 
-io.use(isSocketAuthenticated);
+// io.use(isSocketAuthenticated);
 
 server.listen(process.env.PORT || 3000, () => {
   console.log(`Server running on port ${process.env.PORT}`); 

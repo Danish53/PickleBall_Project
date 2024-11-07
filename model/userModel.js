@@ -48,12 +48,12 @@ const Users = sequelize.define(
       type: DataTypes.STRING,
       allowNull: false,
       unique: true,
-      validate: {
-        is: {
-          args: /^\+?[1-9]\d{1,14}$/,
-          message: "Invalid phone number format!",
-        },
-      },
+      // validate: {
+      //   is: {
+      //     args: /^\+?[1-9]\d{1,14}$/,
+      //     message: "Invalid phone number format!",
+      //   },
+      // },
     },
     userType: {
       type: DataTypes.STRING,

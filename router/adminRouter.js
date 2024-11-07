@@ -13,6 +13,7 @@ import {
   getAllUsers,
   getNotificationsAdmin,
   getSingleCoache,
+  groupListSingleUser,
   markNotificationAsRead,
   statusCheckDocument,
   unbanCoach,
@@ -86,6 +87,7 @@ routerAdmin.get("/allNotifications", isAdmin, getNotificationsAdmin);
 routerAdmin.post("/notifications/mark-as-read", isAdmin, markNotificationAsRead);
 routerAdmin.post("/document-approval/:userId", isAdmin, approveOrRejectDocument);
 routerAdmin.get("/status-check/:userId", isAdmin, statusCheckDocument);
+routerAdmin.get("/group/:userId", isAdmin, groupListSingleUser);
 
 
 export default routerAdmin;

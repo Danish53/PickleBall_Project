@@ -109,6 +109,7 @@ export const getCourtDetails = asyncErrors(async (req, res, next) => {
 export const createGroup = asyncErrors(async (req, res, next) => {
   const { place_id, userId } = req.params;
 
+  // Check if the required parameters are present
   if (!place_id || !userId) {
     return next(new ErrorHandler("Court ID and User ID must be provided", 400));
   }
@@ -131,11 +132,12 @@ export const createGroup = asyncErrors(async (req, res, next) => {
     // Check if a group already exists for this court
     let group = await chatGroups.findOne({ where: { courtId: court.place_id } });
 
-    // If group exists, check if the user is already in the group
     if (group) {
-      const isUserAlreadyInGroup = await groupMembers.findOne({ where: { userId: user.id, groupId: group.id } });
+      // Check if the user is already part of the existing group
+      const isUserAlreadyInGroup = await groupMembers.findOne({
+        where: { userId: user.id, groupId: group.id },
+      });
 
-      // If user is already in the group, return success
       if (isUserAlreadyInGroup) {
         return res.status(200).json({
           success: true,
@@ -144,9 +146,12 @@ export const createGroup = asyncErrors(async (req, res, next) => {
         });
       }
 
-      // If user is not in the group, add the user
+      // Add user to the group if not already a member
       await groupMembers.create({
         groupId: group.id,
+        groupName: group.groupName,
+        latitude: group.latitude,
+        longitude: group.longitude,
         userId: user.id,
         userPhoneNumber: user.phoneNumber,
         userName: user.name,
@@ -161,12 +166,15 @@ export const createGroup = asyncErrors(async (req, res, next) => {
       });
     }
 
-    // If no group exists, create a new group
+    // Create a new group if none exists for the court
     const admin = await Users.findOne({ where: { isAdmin: true } });
+    
+    // If no admin user exists, return an error or set the current user as admin
     if (!admin) {
       return next(new ErrorHandler("No admin user found", 400));
     }
 
+    // Create a new group
     group = await chatGroups.create({
       courtId: court.place_id,
       courtName: court.name,
@@ -179,6 +187,9 @@ export const createGroup = asyncErrors(async (req, res, next) => {
     // Add the user to the newly created group
     await groupMembers.create({
       groupId: group.id,
+      groupName: group.groupName,
+      latitude: group.latitude,
+      longitude: group.longitude,
       userId: user.id,
       userPhoneNumber: user.phoneNumber,
       userName: user.name,
@@ -199,6 +210,7 @@ export const createGroup = asyncErrors(async (req, res, next) => {
     });
   }
 });
+
 
 
 
