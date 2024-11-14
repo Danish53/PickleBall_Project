@@ -1,27 +1,25 @@
 import { DataTypes } from "sequelize";
 import { sequelize } from "../database/dbConnection.js";
 
-const SellerRating = sequelize.define(
-  "sellerRatings",
+const joinTournaments = sequelize.define(
+  "joinTournaments",
   {
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
       autoIncrement: true,
     },
+    tournamentId: {
+      type: DataTypes.INTEGER,
+    },
     userId: {
       type: DataTypes.INTEGER,
     },
-    sellerId: {
-      type: DataTypes.INTEGER,
-      
-    },
-    rating: {
+    tournament_name: {
       type: DataTypes.STRING,
-      validate: {
-        min: 1.0,
-        max: 5.0,
-      },
+    },
+    tournament_type: {
+      type: DataTypes.STRING,
     },
   },
   {
@@ -29,4 +27,4 @@ const SellerRating = sequelize.define(
   }
 );
 
-export { SellerRating };
+export { joinTournaments };

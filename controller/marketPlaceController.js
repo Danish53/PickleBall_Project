@@ -265,10 +265,6 @@ export const allProducts = asyncErrors(async (req, res, next) => {
       },
     });
 
-    if (ratings.length === 0) {
-      return next(new ErrorHandler("No ratings found for these sellers", 404));
-    }
-
     const sellerRatingsMap = ratings.reduce((acc, rating) => {
       if (!acc[rating.sellerId]) {
         acc[rating.sellerId] = { totalRating: 0, count: 0 };
@@ -283,8 +279,9 @@ export const allProducts = asyncErrors(async (req, res, next) => {
       const averageRating = sellerRating
         ? sellerRating.totalRating / sellerRating.count 
         : 0;
-
-      await product.update({ totalRating: averageRating });
+        
+        await product.update({ sellerRating: averageRating.toString()});
+        return { ...product.toJSON(), rating: averageRating };
     }));
 
     res.status(200).json({

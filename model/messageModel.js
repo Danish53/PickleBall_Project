@@ -9,8 +9,8 @@ const Message = sequelize.define(
       primaryKey: true,
       autoIncrement: true,
     },
-    userId: {
-      type: DataTypes.INTEGER,
+    userProfileAvatar: {
+      type: DataTypes.STRING,
     },
     userPhoneNumber: {
       type: DataTypes.STRING,
@@ -20,8 +20,12 @@ const Message = sequelize.define(
       allowNull: false,
     },
     message: {
-      type: DataTypes.TEXT,
+      type: DataTypes.STRING,
       allowNull: false,
+    },
+    isPoll: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
     },
   },
   {

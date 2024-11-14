@@ -1,12 +1,13 @@
-import { Op, where } from "sequelize";
-import { chatGroups } from "../model/chatGroupsModel.js";
+import { Op } from "sequelize";
 import { groupMembers } from "../model/groupMembers.js";
 import { Message } from "../model/messageModel.js";
 import { PrivateMessage } from "../model/privateMessage.js";
 import { Users } from "../model/userModel.js";
+import { PollOptions } from "../model/pollOptionsModel.js";
+import { PollVotes } from "../model/pollVotesModel.js";
 
 export default (io) => {
-  io.on("connection", (socket) => {
+  io.on("connection", async (socket) => {
     console.log("A user connected");
 
     socket.on("userConnect", (userPhoneNumber) => {
@@ -29,116 +30,386 @@ export default (io) => {
 
         if (!groupMember) {
           socket.emit("error", "You are not a member of this group");
-          console.log(`Unauthorized attempt: ${userPhoneNumber} tried to join group ${groupId}`);
+          console.log(
+            `Unauthorized attempt: ${userPhoneNumber} tried to join group ${groupId}`
+          );
           return;
         }
 
         socket.join(groupId);
-        console.log(
-          `User ${userPhoneNumber} joined group ${groupId}`
-        );
+        console.log(`User ${userPhoneNumber} joined group ${groupId}`);
 
-        const messages = await Message.findAll({ 
+        const messages = await Message.findAll({
           where: { groupId },
           order: [["createdAt", "ASC"]],
         });
         socket.emit("loadMessages", messages);
+        console.log("loaded messages", messages);
+
       } catch (error) {
         console.error("Error loading messages:", error);
         socket.emit("error", "Failed to join the group");
       }
     });
 
-    socket.on("sendMessage", async ({ groupId, userPhoneNumber, message }) => {
-      try {
-
-        const groupMemberss = await groupMembers.findAll({ where: { groupId, userPhoneNumber } });
-        console.log("Fetched group members:", groupMemberss); 
-    
-        if (Array.isArray(groupMemberss)) {
-          const newMessage = await Message.create({
-            groupId,
-            userPhoneNumber,
-            message,
-          });
-
-    
-          io.to(groupId).emit("message", newMessage);
-
-          
-          console.log("newMessage", newMessage);
-    
-          // groupMemberss.forEach((member) => {
-          //   if (member.userPhoneNumber !== userPhoneNumber) {
-          //     // Broadcasting notification to each member in their own room
-          //     console.log(`Sending notification to user: ${member.userPhoneNumber}`);
-          //     socket.broadcast
-          //       .to(member.userPhoneNumber.toString())
-          //       .emit("notification", {
-          //         type: "group",
-          //         groupId,
-          //         message: newMessage,
-          //       });
-          //   }
-          // });
-        } else {
-          console.error("No group members found or result is not an array:", groupMemberss);
-        }
-      } catch (error) {
-        console.error("Error sending message:", error.stack);
-      }
-    });
-    
+    // Send a message (including poll creation)
     socket.on(
-      "deleteMessage",
-      async ({ messageId, groupId, userPhoneNumber }) => {
+      "sendMessage",
+      async ({ groupId, userPhoneNumber, message, isPoll, options }) => {
         try {
-          // Check if message exists
-          const message = await Message.findOne({
-            where: { id: messageId, groupId },
+          const groupMember = await groupMembers.findOne({
+            where: { groupId, userPhoneNumber },
           });
 
-          if (!message) {
-            socket.emit("error", "Message not found");
+          if (!groupMember) {
+            socket.emit("error", "You are not a member of this group");
             return;
           }
 
-          // Check if the user is authorized to delete the message
-          if (message.userPhoneNumber !== userPhoneNumber) {
-            socket.emit("error", "You can only delete your own messages");
-            return;
+          // If the message is a poll
+          if (isPoll) {
+            const newMessage = await Message.create({
+              userProfileAvatar: groupMember.profileAvatar || null,
+              groupId,
+              userPhoneNumber,
+              message,
+              isPoll: true,
+            });
+
+            const optionPromises = options.map((option_text) =>
+              PollOptions.create({
+                pollId: newMessage.id,
+                option_text,
+                votes: 0,
+              })
+            );
+
+            await Promise.all(optionPromises);
+            io.to(groupId).emit("newPoll", { message: newMessage, options });
+            console.log("newPoll", { message: newMessage, options });
+
+            console.log("Poll created:", newMessage);
+          } else {
+            const newMessage = await Message.create({
+              userProfileAvatar: groupMember.profileAvatar || null,
+              groupId,
+              userPhoneNumber,
+              message,
+              isPoll: false,
+            });
+
+            io.to(groupId).emit("message", newMessage);
+            console.log("newMessage", newMessage);
           }
-
-          // Delete the message from the database
-          await Message.destroy({ where: { id: messageId } });
-
-          // Emit a delete event to all clients in the group
-          io.to(groupId).emit("messageDeleted", messageId);
-
-          // Optionally, send a notification to group members about the message deletion
-          const groupMemberss = await groupMembers.findAll({
-            where: { groupId },
-          });
-          groupMemberss.forEach((member) => {
-            if (member.userPhoneNumber !== userPhoneNumber) {
-              socket.broadcast
-                .to(member.userPhoneNumber.toString())
-                .emit("notification", {
-                  type: "group",
-                  groupId,
-                  message: `A message was deleted in group ${groupId}`,
-                });
-            }
-          });
         } catch (error) {
-          console.error("Error deleting message:", error);
-          socket.emit("error", "Failed to delete message");
+          console.error("Error sending message:", error);
+          socket.emit("error", "Failed to send message");
         }
       }
     );
 
+    // Voting on a poll
+    socket.on(
+      "votePoll",
+      async ({ groupId, userPhoneNumber, pollId, optionId = 35 }) => {
+        try {
+          const existingVote = await PollVotes.findOne({
+            where: { pollId, userPhoneNumber },
+          });
+
+          if (existingVote) {
+            return socket.emit(
+              "voteError",
+              "You have already voted on this poll."
+            );
+          }
+
+          await PollVotes.create({
+            pollId,
+            userPhoneNumber,
+            selectedOptionId: optionId,
+          });
+
+          console.log("Poll ID:", pollId, "Option ID:", optionId);
+
+          await PollOptions.increment("votes", {
+            by: 1,
+            where: { id: optionId },
+          });
+
+          const poll = await Message.findOne({
+            where: { id: pollId },
+            model: PollOptions,
+            as: "PollOptions",
+            required: true,
+          });
+
+          io.to(groupId).emit("pollResults", poll);
+          console.log(
+            "User voted:",
+            userPhoneNumber,
+            "Poll ID:",
+            pollId,
+            "Option ID:",
+            optionId
+          );
+        } catch (error) {
+          console.error("Error voting on poll:", error);
+          socket.emit("error", "Failed to vote on poll");
+        }
+      }
+    );
+
+    // Deleting a poll
+    socket.on("deletePoll", async ({ groupId, pollId }) => {
+      try {
+        // Destroy the poll and related data
+        await PollVotes.destroy({ where: { pollId } });
+        await PollOptions.destroy({ where: { pollId } });
+        await Message.destroy({ where: { id: pollId } });
+
+        io.to(groupId).emit("pollDeleted", pollId);
+        console.log("Poll deleted:", pollId);
+      } catch (error) {
+        console.error("Error deleting poll:", error);
+        socket.emit("error", "Failed to delete poll");
+      }
+    });
+
+    // Join a group
+    // socket.on("joinGroup", async ({ groupId, userPhoneNumber }) => {
+    //   try {
+    //     const groupMember = await groupMembers.findOne({
+    //       where: { groupId, userPhoneNumber },
+    //     });
+
+    //     if (!groupMember) {
+    //       socket.emit("error", "You are not a member of this group");
+    //       console.log(
+    //         `Unauthorized attempt: ${userPhoneNumber} tried to join group ${groupId}`
+    //       );
+    //       return;
+    //     }
+
+    //     socket.join(groupId);
+    //     console.log(`User ${userPhoneNumber} joined group ${groupId}`);
+
+    //     const messages = await Message.findAll({
+    //       where: { groupId },
+    //       order: [["createdAt", "ASC"]],
+    //     });
+    //     socket.emit("loadMessages", messages);
+    //   } catch (error) {
+    //     console.error("Error loading messages:", error);
+    //     socket.emit("error", "Failed to join the group");
+    //   }
+    // });
+
+    // socket.on("sendMessage", async ({ groupId, userPhoneNumber, message }) => {
+    //   try {
+    //     const groupMemberss = await groupMembers.findAll({
+    //       where: { groupId, userPhoneNumber },
+    //     });
+
+    //     if (Array.isArray(groupMemberss)) {
+    //       const newMessage = await Message.create({
+    //         userProfileAvatar: groupMemberss
+    //           ? groupMemberss.profileAvatar
+    //           : null,
+    //         groupId,
+    //         userPhoneNumber,
+    //         message,
+    //       });
+
+    //       io.to(groupId).emit("message", newMessage);
+
+    //       console.log("newMessage", newMessage);
+
+    //       // groupMemberss.forEach((member) => {
+    //       //   if (member.userPhoneNumber !== userPhoneNumber) {
+    //       //     // Broadcasting notification to each member in their own room
+    //       //     console.log(`Sending notification to user: ${member.userPhoneNumber}`);
+    //       //     socket.broadcast
+    //       //       .to(member.userPhoneNumber.toString())
+    //       //       .emit("notification", {
+    //       //         type: "group",
+    //       //         groupId,
+    //       //         message: newMessage,
+    //       //       });
+    //       //   }
+    //       // });
+    //     } else {
+    //       console.error(
+    //         "No group members found or result is not an array:",
+    //         groupMemberss
+    //       );
+    //     }
+    //   } catch (error) {
+    //     console.error("Error sending message:", error.stack);
+    //   }
+    // });
+
+    // socket.on(
+    //   "deleteMessage",
+    //   async ({ messageId, groupId, userPhoneNumber }) => {
+    //     try {
+    //       // Check if message exists
+    //       const message = await Message.findOne({
+    //         where: { id: messageId, groupId },
+    //       });
+
+    //       if (!message) {
+    //         socket.emit("error", "Message not found");
+    //         return;
+    //       }
+
+    //       // Check if the user is authorized to delete the message
+    //       if (message.userPhoneNumber !== userPhoneNumber) {
+    //         socket.emit("error", "You can only delete your own messages");
+    //         return;
+    //       }
+
+    //       // Delete the message from the database
+    //       await Message.destroy({ where: { id: messageId } });
+
+    //       // Emit a delete event to all clients in the group
+    //       io.to(groupId).emit("messageDeleted", messageId);
+
+    //       // Optionally, send a notification to group members about the message deletion
+    //       const groupMemberss = await groupMembers.findAll({
+    //         where: { groupId },
+    //       });
+    //       groupMemberss.forEach((member) => {
+    //         if (member.userPhoneNumber !== userPhoneNumber) {
+    //           socket.broadcast
+    //             .to(member.userPhoneNumber.toString())
+    //             .emit("notification", {
+    //               type: "group",
+    //               groupId,
+    //               message: `A message was deleted in group ${groupId}`,
+    //             });
+    //         }
+    //       });
+    //     } catch (error) {
+    //       console.error("Error deleting message:", error);
+    //       socket.emit("error", "Failed to delete message");
+    //     }
+    //   }
+    // );
+
+    // // polls group
+    // socket.on(
+    //   "createPoll",
+    //   async ({ groupId, userPhoneNumber, message, options }) => {
+    //     try {
+    //       // let time = new Date();
+    //       // time.setDate(time.getDate() + 1);
+    //       // time.setHours(0, 0, 0, 0);
+    //       // const poll = await Message.create({
+    //       //   // groupId,
+    //       //   // question,
+    //       //   // created_by: userPhoneNumber,
+    //       //   // expiration_time: time, // 1 day
+    //       // });
+
+    //       const groupMemberss = await groupMembers.findAll({
+    //         where: { groupId, userPhoneNumber },
+    //       });
+
+    //       if (Array.isArray(groupMemberss)) {
+    //         const newMessage = await Message.create({
+    //           userProfileAvatar: groupMemberss
+    //             ? groupMemberss.profileAvatar
+    //             : null,
+    //           groupId,
+    //           userPhoneNumber,
+    //           message,
+    //         });
+
+    //         io.to(groupId).emit("message", newMessage);
+
+    //       } else {
+    //         console.error(
+    //           "No group members found or result is not an array:",
+    //           groupMemberss
+    //         );
+    //       }
+
+    //       const optionPromises = options.map((option_text) =>
+    //         PollOptions.create({ pollId: groupMemberss.id, option_text, votes: 0 })
+    //       );
+    //       await Promise.all(optionPromises);
+
+    //       io.to(groupId).emit("newPoll", groupMemberss);
+
+    //       console.log("Poll created:", groupMemberss);
+    //     } catch (error) {
+    //       console.error("Error creating poll:", error.stack);
+    //     }
+    //   }
+    // );
+
+    // socket.on(
+    //   "votePoll",
+    //   async ({ groupId, userPhoneNumber, pollId, optionId }) => {
+    //     try {
+    //       const existingVote = await PollVotes.findOne({
+    //         where: { pollId, userPhoneNumber },
+    //       });
+
+    //       if (existingVote) {
+    //         return socket.emit(
+    //           "voteError",
+    //           "You have already voted on this poll."
+    //         );
+    //       }
+
+    //       await PollVotes.create({
+    //         pollId,
+    //         userPhoneNumber,
+    //         selectedOptionId: optionId,
+    //       });
+
+    //       await PollOptions.increment("votes", {
+    //         by: 1,
+    //         where: { id: optionId },
+    //       });
+
+    //       const poll = await Message.findOne({
+    //         where: { id: pollId },
+    //         include: [PollOptions],
+    //       });
+
+    //       io.to(groupId).emit("pollResults", poll);
+
+    //       console.log(
+    //         "User voted:",
+    //         userPhoneNumber,
+    //         "Poll ID:",
+    //         pollId,
+    //         "Option ID:",
+    //         optionId
+    //       );
+    //     } catch (error) {
+    //       console.error("Error voting on poll:", error.stack);
+    //     }
+    //   }
+    // );
+
+    // socket.on("deletePoll", async ({ groupId, pollId }) => {
+    //   try {
+    //     await Polls.destroy({ where: { id: pollId } });
+    //     await PollOptions.destroy({ where: { pollId } });
+    //     await PollVotes.destroy({ where: { pollId } });
+    //     io.to(groupId).emit("pollDeleted", pollId);
+    //     console.log("Poll deleted:", pollId);
+    //   } catch (error) {
+    //     console.error("Error deleting poll:", error.stack);
+    //   }
+    // });
+
     // ========private chat=========
- 
+
     // Event listener for 'startChat'
     socket.on(
       "startChat",
@@ -220,13 +491,15 @@ export default (io) => {
             return;
           }
 
+          console.log(sender.profileAvatar, "profileAvatar");
+
           // Save the message to the database
           const newMessage = await PrivateMessage.create({
+            senderProfileAvatar: sender.profileAvatar,
             senderPhoneNumber: sender.phoneNumber,
             receiverPhoneNumber: receiver.phoneNumber,
             message,
           });
-
 
           // Create a unique room based on phone numbers
           const privateRoom = [sender.phoneNumber, receiver.phoneNumber]
@@ -247,13 +520,12 @@ export default (io) => {
             senderPhoneNumber: sender.phoneNumber,
             message: newMessage,
           });
-
         } catch (error) {
           console.log("Error sending private message:", error);
           socket.emit("error", "Failed to send message");
         }
       }
-    ); 
+    );
 
     // Event listener for 'deletePrivateMessage'
     socket.on(
@@ -311,7 +583,6 @@ export default (io) => {
       }
     );
 
-
     socket.on("userTyping", ({ senderPhoneNumber, receiverPhoneNumber }) => {
       const privateRoom = [senderPhoneNumber, receiverPhoneNumber]
         .sort()
@@ -337,8 +608,4 @@ export default (io) => {
       console.log("User disconnected");
     });
   });
-
 };
-
-
-

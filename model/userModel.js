@@ -133,6 +133,9 @@ const Users = sequelize.define(
       type: DataTypes.BOOLEAN,
       defaultValue: false,
     },
+    user_rating: {
+      type: DataTypes.STRING,
+    },
     banned: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,

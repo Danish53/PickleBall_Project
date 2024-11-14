@@ -14,6 +14,7 @@ import { Server } from "socket.io";
 import initSocket from "./webSocket/index.js";
 // import { isSocketAuthenticated } from "./middleware/socketAuthentication.js";
 import productroutes from "./router/marketPlaceRouter.js";
+import tournamentsroutes from "./router/tournamentsRoutes.js";
 
 const app = express();
 const a = dotenv.config({ path: "./.env" });
@@ -81,6 +82,8 @@ app.use("/api/v1/user", userRouter);
 app.use("/api/v1/chat", chatRouter); 
 // Market Place
 app.use("/api/v1/product", productroutes); 
+// tournaments
+app.use("/api/v1/tournament", tournamentsroutes);
 
 dbConnection();
 

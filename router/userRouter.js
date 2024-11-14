@@ -21,6 +21,7 @@ import {
   getCourtDetails,
   pickleballCourts,
   searchCourts,
+  singleUserGroups,
 } from "../controller/googleMapController.js";
 import {
   addCoachServices, 
@@ -70,6 +71,9 @@ router.post("/message-status/:receiverPhoneNumber/:messageStatus", isAuthenticat
 
 // sellers ratings
 router.post("/rating/:sellerId", isAuthenticated, checkBannedUser, addSellerRating); 
+
+// groups
+router.get("/single-user-groups/:userId", isAuthenticated, checkBannedUser, singleUserGroups);
 
 
 // router.get("/messages/:userPhoneNumber", getPrivateMessages);

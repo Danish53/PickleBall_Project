@@ -13,6 +13,9 @@ const PrivateMessage = sequelize.define(
       type: DataTypes.TEXT,
       allowNull: false,
     },
+    senderProfileAvatar:{
+      type: DataTypes.STRING,
+    },
     senderPhoneNumber: {
       type: DataTypes.STRING,
       allowNull: false,

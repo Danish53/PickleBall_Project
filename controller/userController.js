@@ -511,6 +511,7 @@ export const updateProfile = asyncErrors(async (req, res, next) => {
     password,
     confirmPassword,
     about_me,
+    user_rating
   } = req.body;
 
   // Ensure all required fields are provided
@@ -538,6 +539,7 @@ export const updateProfile = asyncErrors(async (req, res, next) => {
   if (latitude) user.latitude = latitude;
   if (longitude) user.longitude = longitude;
   if (about_me) user.about_me = about_me;
+  if (user_rating) user.user_rating = user_rating;
 
   // Hash password if provided
   if (password) {
@@ -587,7 +589,6 @@ export const updateProfile = asyncErrors(async (req, res, next) => {
 });
 
 // single user send message list
-
 export const listUsersWhoSentMessages = asyncErrors(async (req, res, next) => {
   const { receiverPhoneNumber } = req.params;
 

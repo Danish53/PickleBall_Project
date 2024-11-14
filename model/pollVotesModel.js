@@ -1,27 +1,24 @@
 import { DataTypes } from "sequelize";
 import { sequelize } from "../database/dbConnection.js";
 
-const SellerRating = sequelize.define(
-  "sellerRatings",
+const PollVotes = sequelize.define(
+  "pollVotes",
   {
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
       autoIncrement: true,
     },
-    userId: {
+    pollId: {
       type: DataTypes.INTEGER,
+      allowNull: false,
     },
-    sellerId: {
-      type: DataTypes.INTEGER,
-      
-    },
-    rating: {
+    userPhoneNumber: {
       type: DataTypes.STRING,
-      validate: {
-        min: 1.0,
-        max: 5.0,
-      },
+    },
+    selectedOptionId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
     },
   },
   {
@@ -29,4 +26,4 @@ const SellerRating = sequelize.define(
   }
 );
 
-export { SellerRating };
+export { PollVotes };

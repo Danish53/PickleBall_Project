@@ -109,31 +109,25 @@ export const getCourtDetails = asyncErrors(async (req, res, next) => {
 export const createGroup = asyncErrors(async (req, res, next) => {
   const { place_id, userId } = req.params;
 
-  // Check if the required parameters are present
   if (!place_id || !userId) {
     return next(new ErrorHandler("Court ID and User ID must be provided", 400));
   }
 
   try {
-    // Fetch court details
     const court = await getCourtDetailsById(place_id);
 
-    // Validate if the court exists
     if (!court) {
       return next(new ErrorHandler("Court not found for the provided ID", 404));
     }
 
-    // Check if the user exists
     const user = await Users.findOne({ where: { id: userId } });
     if (!user) {
       return next(new ErrorHandler("User not found", 400));
     }
 
-    // Check if a group already exists for this court
     let group = await chatGroups.findOne({ where: { courtId: court.place_id } });
 
     if (group) {
-      // Check if the user is already part of the existing group
       const isUserAlreadyInGroup = await groupMembers.findOne({
         where: { userId: user.id, groupId: group.id },
       });
@@ -146,7 +140,6 @@ export const createGroup = asyncErrors(async (req, res, next) => {
         });
       }
 
-      // Add user to the group if not already a member
       await groupMembers.create({
         groupId: group.id,
         groupName: group.groupName,
@@ -154,7 +147,7 @@ export const createGroup = asyncErrors(async (req, res, next) => {
         longitude: group.longitude,
         userId: user.id,
         userPhoneNumber: user.phoneNumber,
-        userName: user.name,
+        userName: user.userName,
         userType: user.userType,
         profileAvatar: user.profileAvatar,
       });
@@ -166,10 +159,8 @@ export const createGroup = asyncErrors(async (req, res, next) => {
       });
     }
 
-    // Create a new group if none exists for the court
     const admin = await Users.findOne({ where: { isAdmin: true } });
     
-    // If no admin user exists, return an error or set the current user as admin
     if (!admin) {
       return next(new ErrorHandler("No admin user found", 400));
     }
@@ -192,7 +183,7 @@ export const createGroup = asyncErrors(async (req, res, next) => {
       longitude: group.longitude,
       userId: user.id,
       userPhoneNumber: user.phoneNumber,
-      userName: user.name,
+      userName: user.userName,
       userType: user.userType,
       profileAvatar: user.profileAvatar,
     });
@@ -211,8 +202,45 @@ export const createGroup = asyncErrors(async (req, res, next) => {
   }
 });
 
+// get single user groups
+export const singleUserGroups = asyncErrors(async (req, res, next) => {
+  const { userId } = req.params;
 
+  if (!userId) {
+    return next(new ErrorHandler("User ID must be provided", 400));
+  }
 
+  try {
+    const user = await Users.findOne({ where: { id: userId } });
+    if (!user) {
+      return next(new ErrorHandler("User not found", 400));
+    }
+
+    const groups = await groupMembers.findAll({
+      where: { userId: user.id },
+    });
+
+    if (!groups || groups.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "User has no groups",
+        groups: [],
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "User groups fetched successfully",
+      groups,
+    });
+  } catch (error) {
+    console.error("Error fetching user groups:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
+  }
+});
 
 //admin
 export const chatGroup = asyncErrors(async (req, res, next) => {

@@ -26,7 +26,7 @@ const groupMembers = sequelize.define(
       type: DataTypes.STRING,
     },
     userPhoneNumber: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.STRING,
     },
     userName: {
       type: DataTypes.STRING,
