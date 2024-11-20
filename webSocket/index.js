@@ -42,13 +42,43 @@ export default (io) => {
         const messages = await Message.findAll({
           where: { groupId },
           order: [["createdAt", "ASC"]],
+          raw: true,
         });
-        socket.emit("loadMessages", messages);
-        console.log("loaded messages", messages);
 
+        // Find poll message IDs
+        const pollMessageIds = messages
+          .filter((msg) => Number(msg.isPoll) === 1) 
+          .map((msg) => msg.id);
+
+        const pollOptions = pollMessageIds.length > 0
+            ? await PollOptions.findAll({
+                where: { pollId: pollMessageIds },
+                attributes: ["id", "pollId", "option_text", "votes"],
+                raw: true,
+              })
+            : [];
+
+        const formattedMessages = messages.map((msg) => {
+          // options with option id
+          const options =
+    Number(msg.isPoll) === 1
+      ? pollOptions
+          .filter((option) => option.pollId === msg.id)
+          .map((option) => ({
+            ...option, 
+            option_id: option.id,
+          }))
+      : [];
+          return {
+            ...msg,
+            options,
+          };
+        });
+
+        socket.emit("loadMessages", formattedMessages);
       } catch (error) {
         console.error("Error loading messages:", error);
-        socket.emit("error", "Failed to join the group");
+        socket.emit("error", `Failed to join the group: ${error.message}`);
       }
     });
 
@@ -73,7 +103,7 @@ export default (io) => {
               groupId,
               userPhoneNumber,
               message,
-              isPoll: true,
+              isPoll,
             });
 
             const optionPromises = options.map((option_text) =>
@@ -86,7 +116,6 @@ export default (io) => {
 
             await Promise.all(optionPromises);
             io.to(groupId).emit("newPoll", { message: newMessage, options });
-            console.log("newPoll", { message: newMessage, options });
 
             console.log("Poll created:", newMessage);
           } else {
@@ -95,7 +124,7 @@ export default (io) => {
               groupId,
               userPhoneNumber,
               message,
-              isPoll: false,
+              isPoll,
             });
 
             io.to(groupId).emit("message", newMessage);
@@ -109,56 +138,89 @@ export default (io) => {
     );
 
     // Voting on a poll
-    socket.on(
-      "votePoll",
-      async ({ groupId, userPhoneNumber, pollId, optionId = 35 }) => {
-        try {
-          const existingVote = await PollVotes.findOne({
-            where: { pollId, userPhoneNumber },
+    socket.on("votePoll", async ({ groupId, userPhoneNumber, pollId, optionId }) => {
+      try {
+        // Check if the user has already voted
+        const existingVote = await PollVotes.findOne({
+          where: { pollId, userPhoneNumber },
+        });
+    
+        if (existingVote) {
+          // Decrement the previous option's vote count
+          await PollOptions.increment("votes", {
+            by: -1,
+            where: { id: existingVote.selectedOptionId },
           });
-
-          if (existingVote) {
-            return socket.emit(
-              "voteError",
-              "You have already voted on this poll."
-            );
-          }
-
+    
+          // Update the vote to the new option
+          existingVote.selectedOptionId = optionId;
+          await existingVote.save();
+        } else {
+          // Create a new vote
           await PollVotes.create({
             pollId,
             userPhoneNumber,
             selectedOptionId: optionId,
           });
-
-          console.log("Poll ID:", pollId, "Option ID:", optionId);
-
-          await PollOptions.increment("votes", {
-            by: 1,
-            where: { id: optionId },
-          });
-
-          const poll = await Message.findOne({
-            where: { id: pollId },
-            model: PollOptions,
-            as: "PollOptions",
-            required: true,
-          });
-
-          io.to(groupId).emit("pollResults", poll);
-          console.log(
-            "User voted:",
-            userPhoneNumber,
-            "Poll ID:",
-            pollId,
-            "Option ID:",
-            optionId
-          );
-        } catch (error) {
-          console.error("Error voting on poll:", error);
-          socket.emit("error", "Failed to vote on poll");
         }
+    
+        // Increment the new option's vote count
+        await PollOptions.increment("votes", {
+          by: 1,
+          where: { id: optionId },
+        });
+    
+        // Fetch the poll question from the Message table
+        const poll = await Message.findOne({
+          where: { id: pollId },
+          attributes: ["id", "message"], // Fetch only relevant fields
+        });
+    
+        if (!poll) {
+          socket.emit("error", "Poll not found");
+          return;
+        }
+    
+        console.log('Poll:', poll);  // Log poll data
+    
+        // Fetch all poll options for the given pollId
+        const options = await PollOptions.findAll({
+          where: { pollId },
+          attributes: ["id", "option_text", "votes"],
+        });
+    
+        console.log('Fetched Options:', options);  // Log the options
+    
+        if (!options.length) {
+          socket.emit("error", "Poll options not found");
+          return;
+        }
+    
+        // Emit the updated poll results to the group
+        io.to(groupId).emit("pollResults", {
+          poll: {
+            id: poll.id,
+            question: poll.message,  // Correct the question field
+            options: options,        // Pass the options
+          },
+        });
+    
+        console.log(
+          "User voted:",
+          userPhoneNumber,
+          "Poll ID:",
+          pollId,
+          "Option ID:",
+          optionId
+        );
+      } catch (error) {
+        console.error("Error voting on poll:", error);
+        socket.emit("error", "Failed to vote on poll");
       }
-    );
+    });
+    
+    
+    
 
     // Deleting a poll
     socket.on("deletePoll", async ({ groupId, pollId }) => {

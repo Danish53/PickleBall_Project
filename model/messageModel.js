@@ -24,7 +24,7 @@ const Message = sequelize.define(
       allowNull: false,
     },
     isPoll: {
-      type: DataTypes.BOOLEAN,
+      type: DataTypes.INTEGER,
       defaultValue: false,
     },
   },

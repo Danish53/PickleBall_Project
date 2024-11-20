@@ -2,10 +2,14 @@ import express from "express";
 import { isAuthenticated } from "../middleware/auth.js";
 import { checkBannedUser } from "../middleware/bannedUser.js";
 import {
+  acceptOrRejectRequest,
+  allPlayers,
   allTournaments,
   createTournament,
+  getRequests,
   joinedTournamentsUsers,
   joinTournament,
+  sendRequestToPlayers,
   singleUserTournaments,
 } from "../controller/tournamentsController.js";
 
@@ -41,6 +45,30 @@ tournamentsroutes.get(
   isAuthenticated,
   checkBannedUser,
   joinedTournamentsUsers
+);
+tournamentsroutes.get(
+  "/all-players",
+  isAuthenticated,
+  checkBannedUser,
+  allPlayers
+);
+tournamentsroutes.post(
+  "/send-request/:userId/:tournamentId",
+  isAuthenticated,
+  checkBannedUser,
+  sendRequestToPlayers
+);
+tournamentsroutes.get(
+  "/all-requests/:userId",
+  isAuthenticated,
+  checkBannedUser,
+  getRequests
+);
+tournamentsroutes.post(
+  "/accept-request/:requestId",
+  isAuthenticated,
+  checkBannedUser,
+  acceptOrRejectRequest
 );
 
 export default tournamentsroutes;

@@ -37,6 +37,9 @@ const groupMembers = sequelize.define(
     profileAvatar: {
       type: DataTypes.STRING,
     },
+    courtImage: {
+      type: DataTypes.STRING,
+    },
   },
   {
     timestamps: true,

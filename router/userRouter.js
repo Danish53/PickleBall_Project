@@ -59,7 +59,7 @@ router.post(
 router.get("/pickleball-courts", isAuthenticated, checkBannedUser, pickleballCourts);
 router.get("/search-courts/:latitude/:longitude", isAuthenticated, checkBannedUser, searchCourts);
 router.get("/court-detail/:place_id", isAuthenticated, checkBannedUser, getCourtDetails);
-router.get("/create-group/:place_id/:userId", isAuthenticated, checkBannedUser, createGroup);
+router.post("/create-group/:place_id/:userId", isAuthenticated, checkBannedUser, createGroup);
 //coaches
 router.get("/coaches/:groupId", isAuthenticated, checkBannedUser, getCoaches);
 router.post("/addSchedule/:coachId", isAuthenticated, checkBannedUser, addSchedule);

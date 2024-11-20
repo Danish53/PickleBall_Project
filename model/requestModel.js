@@ -1,28 +1,27 @@
 import { DataTypes } from "sequelize";
 import { sequelize } from "../database/dbConnection.js";
 
-const joinTournaments = sequelize.define(
-  "joinTournaments",
+const Requests = sequelize.define(
+  "requests",
   {
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
       autoIncrement: true,
     },
+    senderId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
+    receiverId:{
+      type: DataTypes.INTEGER,
+    },
     tournamentId: {
       type: DataTypes.INTEGER,
+      allowNull: false,
     },
-    userId: {
+    status: {
       type: DataTypes.INTEGER,
-    },
-    tournament_name: {
-      type: DataTypes.STRING,
-    },
-    tournament_type: {
-      type: DataTypes.STRING,
-    },
-    end_date: {
-      type: DataTypes.DATE,
     },
   },
   {
@@ -30,4 +29,4 @@ const joinTournaments = sequelize.define(
   }
 );
 
-export { joinTournaments };
+export { Requests };

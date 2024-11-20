@@ -15,9 +15,9 @@ const Tournaments = sequelize.define(
     tournament_type: {
       type: DataTypes.STRING,
       validate: {
-        isIn: {
-          args: [["leagues", "round robin"]],
-          message: "tournaments types must be either 'leagues' , 'roundrobin'!",
+        isIn: { 
+          args: [["leagues", "round robin", "double eleminations"]],
+          message: "tournaments types must be either 'leagues' , 'round robin', 'double eleminations'!",
         },
       },
     },

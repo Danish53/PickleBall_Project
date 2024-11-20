@@ -16,8 +16,7 @@ export const generateGridPoints = (step = 1.0) => {
     }
   }
   return points;
-};    
- 
+};
 
 export const getPickleballCourts = async (latitude, longitude, radius) => {
   let courts = [];
@@ -57,18 +56,16 @@ export const getPickleballCourts = async (latitude, longitude, radius) => {
     nextPageToken = response.data.next_page_token;
 
     if (nextPageToken) {
-      await new Promise((resolve) => setTimeout(resolve, 2000)); 
+      await new Promise((resolve) => setTimeout(resolve, 2000));
     }
-
-    
   } while (nextPageToken);
 
   const detailedCourts = await Promise.all(
     courts.map(async (court) => {
       const courtDetails = await getCourtDetailsById(court.place_id);
-      
+
       return {
-        ...court, 
+        ...court,
       };
     })
   );
@@ -89,10 +86,9 @@ export const getCourtDetailsById = async (place_id) => {
     );
 
     return response.data.result;
+
   } catch (error) {
     console.error("Error fetching court details:", error);
     throw error;
   }
 };
-
-

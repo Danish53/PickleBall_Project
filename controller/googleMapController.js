@@ -1,7 +1,9 @@
+import { sequelize } from "../database/dbConnection.js";
 import { asyncErrors } from "../middleware/asyncErrors.js";
 import ErrorHandler from "../middleware/error.js";
 import { chatGroups } from "../model/chatGroupsModel.js";
 import { groupMembers } from "../model/groupMembers.js";
+import { Message } from "../model/messageModel.js";
 import { Users } from "../model/userModel.js";
 import {
   generateGridPoints,
@@ -9,7 +11,7 @@ import {
   getPickleballCourts,
 } from "../utils/courts.js";
 
-// const apiKey = process.env.GOOGLE_MAP_API_KEY;
+const apiKey = process.env.GOOGLE_MAP_API_KEY;
 //admin & user
 export const pickleballCourts = asyncErrors(async (req, res, next) => {
   const { page = 1, pageSize = 15 } = req.query;
@@ -55,7 +57,7 @@ export const searchCourts = asyncErrors(async (req, res, next) => {
     return next(new ErrorHandler("Latitude and longitude are required", 400));
   }
 
-  const radius = 10000;
+  const radius = 50000; 
   const courts = await getPickleballCourts(latitude, longitude, radius);
 
   const totalCourts = courts.length;
@@ -67,10 +69,26 @@ export const searchCourts = asyncErrors(async (req, res, next) => {
     });
   }
 
-  const courtData = courts.map((court) => ({
-    id: court.place_id,
-    name: court.name,
-  }));
+    const getPhotoUrl = (photoReference, maxWidth = 400) => {
+      return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${maxWidth}&photoreference=${photoReference}&key=${apiKey}`;
+    };
+
+  const courtData = courts.map((court) => {
+    const photos = court.photos
+      ? court.photos.map((photo) =>
+          getPhotoUrl(photo.photo_reference)
+        )
+      : [];
+
+    return {
+      id: court.place_id,
+      name: court.name,
+      latitude: court.geometry.location.lat,
+      longitude: court.geometry.location.lng,
+      photos, 
+    };
+  });
+
 
   res.status(200).json({
     success: true,
@@ -115,9 +133,14 @@ export const createGroup = asyncErrors(async (req, res, next) => {
 
   try {
     const court = await getCourtDetailsById(place_id);
+    if (!court || !court.geometry || !court.geometry.location) {
+      return next(new ErrorHandler("Court data is invalid or missing", 404));
+    }
 
-    if (!court) {
-      return next(new ErrorHandler("Court not found for the provided ID", 404));
+    let courtImage = null;
+    if (court.photos && court.photos.length > 0) {
+      const photoReference = court.photos[0].photo_reference;
+      courtImage = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${photoReference}&key=${apiKey}`;
     }
 
     const user = await Users.findOne({ where: { id: userId } });
@@ -125,7 +148,7 @@ export const createGroup = asyncErrors(async (req, res, next) => {
       return next(new ErrorHandler("User not found", 400));
     }
 
-    let group = await chatGroups.findOne({ where: { courtId: court.place_id } });
+    let group = await chatGroups.findOne({ where: { courtId: court.place_id,  } });
 
     if (group) {
       const isUserAlreadyInGroup = await groupMembers.findOne({
@@ -150,6 +173,7 @@ export const createGroup = asyncErrors(async (req, res, next) => {
         userName: user.userName,
         userType: user.userType,
         profileAvatar: user.profileAvatar,
+        courtImage: group.courtImage
       });
 
       return res.status(200).json({
@@ -159,23 +183,27 @@ export const createGroup = asyncErrors(async (req, res, next) => {
       });
     }
 
-    const admin = await Users.findOne({ where: { isAdmin: true } });
-    
+    let admin = await Users.findOne({ where: { isAdmin: true } });
     if (!admin) {
-      return next(new ErrorHandler("No admin user found", 400));
+      admin = await Users.create({
+        userName: "Default Admin",
+        phoneNumber: "0000000000",
+        isAdmin: true,
+        userType: "admin",
+        profileAvatar: null,
+      });
     }
 
-    // Create a new group
     group = await chatGroups.create({
       courtId: court.place_id,
       courtName: court.name,
+      courtImage: courtImage,
       groupName: court.name,
       latitude: court.geometry.location.lat,
       longitude: court.geometry.location.lng,
       adminId: admin.id,
     });
 
-    // Add the user to the newly created group
     await groupMembers.create({
       groupId: group.id,
       groupName: group.groupName,
@@ -186,7 +214,9 @@ export const createGroup = asyncErrors(async (req, res, next) => {
       userName: user.userName,
       userType: user.userType,
       profileAvatar: user.profileAvatar,
+      courtImage: group.courtImage
     });
+
 
     return res.status(200).json({
       success: true,
@@ -197,7 +227,7 @@ export const createGroup = asyncErrors(async (req, res, next) => {
     console.error("Error creating or joining group:", error);
     return res.status(500).json({
       success: false,
-      message: "Internal Server Error",
+      message: `Internal Server Error: ${error.message}`,
     });
   }
 });
@@ -211,16 +241,19 @@ export const singleUserGroups = asyncErrors(async (req, res, next) => {
   }
 
   try {
+    // Find the user
     const user = await Users.findOne({ where: { id: userId } });
     if (!user) {
-      return next(new ErrorHandler("User not found", 400));
+      return next(new ErrorHandler("User not found", 404));
     }
 
-    const groups = await groupMembers.findAll({
+    // Get all groups the user belongs to
+    const userGroups = await groupMembers.findAll({
       where: { userId: user.id },
+      raw: true,
     });
 
-    if (!groups || groups.length === 0) {
+    if (!userGroups.length) {
       return res.status(200).json({
         success: true,
         message: "User has no groups",
@@ -228,10 +261,39 @@ export const singleUserGroups = asyncErrors(async (req, res, next) => {
       });
     }
 
+    const groupIds = userGroups.map((group) => group.groupId);
+
+    // Fetch latest message for each group
+    const latestMessages = await Message.findAll({
+      attributes: [
+        "groupId",
+        "message",
+        [sequelize.fn("MAX", sequelize.col("createdAt")), "latestMessageTime"],
+      ],
+      where: { groupId: groupIds },
+      group: ["groupId", "message"],
+      order: [["latestMessageTime", "DESC"]],
+      raw: true,
+    });
+
+    // Map groups with their latest messages
+    const responseGroups = userGroups.map((group) => {
+      const messageData = latestMessages.find(
+        (msg) => msg.groupId === group.groupId
+      );
+
+      return {
+        ...group,
+        // courtImage: messageData.courtImage,
+        latestMessage: messageData?.message || null,
+        latestMessageTime: messageData?.latestMessageTime || null,
+      };
+    });
+
     return res.status(200).json({
       success: true,
       message: "User groups fetched successfully",
-      groups,
+      groups: responseGroups,
     });
   } catch (error) {
     console.error("Error fetching user groups:", error);
@@ -241,6 +303,8 @@ export const singleUserGroups = asyncErrors(async (req, res, next) => {
     });
   }
 });
+
+
 
 //admin
 export const chatGroup = asyncErrors(async (req, res, next) => {

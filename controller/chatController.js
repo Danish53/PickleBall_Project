@@ -46,6 +46,8 @@ export const joinGroup = asyncErrors(async (req, res, next) => {
       return next(new ErrorHandler("User already exist in this Number!", 400));
     }
 
+
+
     let members = await groupMembers.create({
       groupId: group.id,
       userId: user.id,

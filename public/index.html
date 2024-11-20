@@ -1,5 +1,5 @@
 <!-- group -->
-<!-- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -68,8 +68,8 @@
             const sendMessageButton = document.getElementById('sendMessageButton');
             const notifications = document.getElementById('notifications');
 
-            const groupId = prompt("Enter Group ID:", "58");
-            const userPhoneNumber = prompt("Enter User phone number:", "423434786");
+            const groupId = prompt("Enter Group ID:", "64");
+            const userPhoneNumber = prompt("Enter User phone number:", "03071010563");
 
             socket.emit('joinGroup', { groupId, userPhoneNumber });
 
@@ -105,7 +105,7 @@
         });
     </script>
 </body>
-</html> -->
+</html>
 
 <!-- one to one chat -->
 <!-- <!DOCTYPE html>
@@ -373,165 +373,6 @@
   </body>
 </html> -->
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chat & Polls</title>
-  <link rel="stylesheet" href="styles.css">
-</head>
-<body>
-  <div class="chat-container">
-    <div id="messages" class="messages"></div>
-
-    <div id="polls" class="polls"></div>
-
-    <div class="message-input">
-      <input type="text" id="messageInput" placeholder="Enter your message..." />
-      <button id="sendMessageBtn">Send Message</button>
-    </div>
-
-    <div class="poll-input">
-      <input type="text" id="pollQuestion" placeholder="Enter poll question..." />
-      <input type="text" id="pollOption1" placeholder="Option 1" />
-      <input type="text" id="pollOption2" placeholder="Option 2" />
-      <button id="createPollBtn">Create Poll</button>
-    </div>
-
-    <div class="vote-input">
-      <select id="voteOptions">
-        <option value="">Select Poll to Vote</option>
-      </select>
-      <button id="voteBtn">Vote</button>
-    </div>
-  </div>
-
-  <script src="/socket.io/socket.io.js"></script>
-  
-  <script>
-    // Connect to the backend
-const socket = io('http://localhost:8000');  // Adjust this to match your server URL
-
-// The group ID and user phone number should come from somewhere in your app
-const groupId = 63;  // Example group ID
-const userPhoneNumber = '03439730850';  // Example user phone number
-
-// Join the group
-socket.emit("joinGroup", { groupId, userPhoneNumber });
-
-// Send a message (including polls)
-document.getElementById('sendMessageBtn').addEventListener('click', () => {
-  const message = document.getElementById('messageInput').value;
-  
-  if (message.trim() === "") return;
-
-  socket.emit("sendMessage", { 
-    groupId, 
-    userPhoneNumber, 
-    message,
-    isPoll: false,  // This is a regular message
-  });
-
-  document.getElementById('messageInput').value = "";  // Clear input
-});
-
-// Create a poll
-document.getElementById('createPollBtn').addEventListener('click', () => {
-  const question = document.getElementById('pollQuestion').value;
-  const option1 = document.getElementById('pollOption1').value;
-  const option2 = document.getElementById('pollOption2').value;
-
-  if (question.trim() === "" || option1.trim() === "" || option2.trim() === "") return;
-
-  socket.emit("sendMessage", { 
-    groupId, 
-    userPhoneNumber, 
-    message: question,
-    isPoll: true, 
-    options: [option1, option2]  // Poll options
-  });
-
-  document.getElementById('pollQuestion').value = "";
-  document.getElementById('pollOption1').value = "";
-  document.getElementById('pollOption2').value = "";
-});
-
-// Vote on a poll
-document.getElementById('voteBtn').addEventListener('click', () => {
-  // const selectedPollId = document.getElementById('voteOptions').value;
-  const selectedOptionId = document.querySelector('input[name="voteOption"]:checked')?.value;
-
-  if (!selectedOptionId){
-    return(console.log("not select option!"))
-  };
-
-  socket.emit("votePoll", {
-    groupId,
-    userPhoneNumber,
-    pollId: selectedPollId,
-    optionId: selectedOptionId,
-  });
-});
-
-// Receive messages (including polls)
-socket.on("message", (message) => {
-  const messagesDiv = document.getElementById('messages');
-  const messageElement = document.createElement('div');
-  messageElement.textContent = message.message;
-  messagesDiv.appendChild(messageElement);
-});
-
-// Receive new polls
-socket.on("newPoll", (data) => {
-  const pollsDiv = document.getElementById('polls');
-  const pollElement = document.createElement('div');
-  console.log(data, '....................');
-  pollElement.innerHTML = `
-    <p>${data.message.message}</p>
-    <div id="pollOptions${data.message.id}">
-      ${data.options.map((option, index) => {
-        return `<input type="radio" name="voteOption" value="${data.message.id}" /> ${option}<br>`;
-        console.log(option, "option...........")
-      }).join('')}
-    </div>
-    <button onclick="submitVote(${data.message.id})">Vote</button>
-  `;
-  pollsDiv.appendChild(pollElement);
-
-  // Add poll to vote options dropdown
-  // const voteOptionsSelect = document.getElementById('voteOptions');
-  // const optionElement = document.createElement('option');
-  // optionElement.value = data.message.id;
-  // optionElement.textContent = data.message.message;
-  // voteOptionsSelect.appendChild(optionElement);
-});
-
-// Receive poll results
-socket.on("pollResults", (poll) => {
-  console.log(poll, "polllll.......")
-  const pollResultsDiv = document.getElementById('polls');
-  const pollResultsElement = document.createElement('div');
-  pollResultsElement.innerHTML = `
-    <p><strong>${poll.message.message}</strong></p>
-    <div>
-      ${poll.PollOptions.map(option => {
-        return `${option.option_text}: ${option.votes} votes<br>`;
-        console.log(option, "''''''''''''''''")
-      }).join('')}
-    </div>
-  `;
-  pollResultsDiv.appendChild(pollResultsElement);
-});
-
-// Handle errors
-socket.on("error", (errorMessage) => {
-  alert(errorMessage);
-});
-
-  </script>
-</body>
-</html>
 
 
 
